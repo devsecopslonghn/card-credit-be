@@ -26,6 +26,7 @@ ENV CARD_CATALOG_PATH=/app/catalog/card-presets.json
 RUN addgroup -S backend && adduser -S backend -G backend
 ENV NODE_OPTIONS="--experimental-loader=@opentelemetry/instrumentation/hook.mjs --import @opentelemetry/auto-instrumentations-node/register"
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /shared /shared
 COPY --from=builder /app/dist ./dist
 COPY backend/catalog/card-presets.json ./catalog/card-presets.json
 USER backend
