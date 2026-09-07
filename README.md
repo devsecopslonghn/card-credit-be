@@ -1,15 +1,13 @@
 # card-credit-be
 
-Fastify/Mongoose backend and MCP server for Card Credit. The repository is
-self-contained and keeps the shared runtime contracts under `shared/`.
+Java 21 / Spring Boot backend for Card Credit. The repository has one Maven
+runtime under `src/`; the former Fastify/Node implementation and copied
+contract package have been removed.
 
 ## Local verification
 
 ```bash
-npm --prefix shared ci
-npm --prefix backend ci --include=optional
-npm --prefix shared run validate
-npm --prefix backend run validate
+./mvnw -B verify
 ```
 
 The backend image is published as

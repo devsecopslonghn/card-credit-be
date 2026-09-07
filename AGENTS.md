@@ -1,10 +1,8 @@
 # card-credit-be working agreement
 
-This repository is migrating the backend to Java 21/Spring Boot. The target
-runtime is `src/main/java` and Maven; the legacy `backend/` tree is retained
-only as an explicitly unshipped porting reference until capability parity is
-verified. Do not delete it or publish the Java image as compatible with the
-full API until the contract matrix is complete.
+This repository owns the Java 21/Spring Boot runtime under `src/`, its Mongo
+persistence boundary, API capabilities, tests, and container image. The
+former Fastify/Node implementation has been removed.
 
 Run the lightweight gate before handoff:
 
