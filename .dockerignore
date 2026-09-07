@@ -1,0 +1,10 @@
+.git
+backend/node_modules
+backend/dist
+backend/coverage
+shared/node_modules
+shared/coverage
+node_modules
+npm-debug.log*
+.env
+.env.*
