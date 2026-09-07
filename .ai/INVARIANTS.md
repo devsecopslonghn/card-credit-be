@@ -7,3 +7,4 @@
 - The runtime image must start `dist/src/server.js` with all linked shared
   runtime dependencies available; build-only dependencies must be pruned.
 - Deployment migration/index jobs must use the backend image tag currently in the chart.
+- The Java runtime may not replace the legacy API image in production until the compatibility matrix and financial regression suite pass.

@@ -1,7 +1,7 @@
 # Backend system context
 
-- Ownership: `backend/` Fastify, REST, MCP, domain/services, persistence and jobs.
-- Contract input: local `shared/`; synchronize contract changes with `card-credit-fe/shared`.
+- Ownership: `src/main/java` Spring Boot REST/domain/persistence runtime.
+- Legacy reference: `backend/` is not part of the Java image and remains only until parity migration is verified.
 - Delivery: push to `master` runs quality, publishes `ghcr.io/devsecopslonghn/card-credit-be:<sha>`, then updates the chart repository.
-- Runtime dependency: the `file:../shared` package resolves through `/shared` in the container; the runner must retain that path and its production dependencies.
+- Runtime dependency: Java 21 JRE and the existing MongoDB database; no FE source package is imported.
 - Verification authority: `./.agent/gates/verify.sh` and the repository workflow.
