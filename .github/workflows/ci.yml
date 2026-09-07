@@ -43,8 +43,8 @@ jobs:
           file: backend/Dockerfile
           push: true
           tags: |
-            ${{ vars.GHCR_REGISTRY }}/${{ github.repository_owner }}/card-credit-backend:${{ github.sha }}
-            ${{ vars.GHCR_REGISTRY }}/${{ github.repository_owner }}/card-credit-backend:latest
+            ${{ vars.GHCR_REGISTRY }}/${{ github.repository_owner }}/card-credit-be:${{ github.sha }}
+            ${{ vars.GHCR_REGISTRY }}/${{ github.repository_owner }}/card-credit-be:latest
 
   update-chart:
     needs: image
@@ -71,8 +71,8 @@ jobs:
           for i, line in enumerate(lines):
               if line == "  backend:" and i + 1 < len(lines):
                   lines[i + 1] = "    tag: " + os.environ["IMAGE_TAG"]
-              if line.strip() == "repository: ghcr.io/devsecopslonghn/card-credit-backend":
-                  lines[i] = "    repository: " + os.environ["GHCR_REGISTRY"] + "/" + os.environ["IMAGE_OWNER"] + "/card-credit-backend"
+              if line.strip() == "repository: ghcr.io/devsecopslonghn/card-credit-be":
+                  lines[i] = "    repository: " + os.environ["GHCR_REGISTRY"] + "/" + os.environ["IMAGE_OWNER"] + "/card-credit-be"
           path.write_text("\n".join(lines) + "\n")
           PY
           git config user.name github-actions[bot]

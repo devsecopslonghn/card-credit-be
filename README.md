@@ -13,4 +13,4 @@ npm --prefix backend run validate
 ```
 
 The backend image is published as
-`ghcr.io/devsecopslonghn/card-credit-backend:<commit-sha>`.
+`ghcr.io/devsecopslonghn/card-credit-be:<commit-sha>`.
