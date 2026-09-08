@@ -1,8 +1,9 @@
 # card-credit-be working agreement
 
-This repository owns the Java 21/Spring Boot runtime under `src/`, its Mongo
-persistence boundary, API capabilities, tests, and container image. The
-former Fastify/Node implementation has been removed.
+This repository owns the compatible Fastify/Mongoose backend under `backend/`,
+its shared contracts under `shared/`, financial/MCP APIs, tests and image.
+The Java bootstrap was removed from the delivery path because it did not yet
+implement the existing API contract.
 
 Run the lightweight gate before handoff:
 

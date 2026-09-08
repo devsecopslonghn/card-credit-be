@@ -1,0 +1,25 @@
+{
+  "name": "@card-credit/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit --allowJs --checkJs --module NodeNext --moduleResolution NodeNext --target ES2022 src/index.js",
+    "typecheck": "npm run build",
+    "test": "node --test tests/*.test.js",
+    "test:all": "node --test tests/*.test.js",
+    "validate": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

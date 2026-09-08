@@ -8,9 +8,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with: {distribution: temurin, java-version: '21', cache: maven}
-      - run: ./mvnw -B verify
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Install dependencies
+        run: |
+          npm --prefix shared ci
+          npm --prefix backend ci --include=optional
+      - name: Validate
+        run: |
+          npm --prefix shared run validate
+          npm --prefix backend run validate
   image:
     needs: quality
     if: github.event_name != 'pull_request'
@@ -22,6 +29,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
+          file: backend/Dockerfile
           push: true
           tags: |
             ${{ vars.GHCR_REGISTRY }}/${{ github.repository_owner }}/card-credit-be:${{ github.sha }}

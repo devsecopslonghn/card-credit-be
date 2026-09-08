@@ -1,0 +1,8 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { guardProductionImport, importCatalog } from "../src/catalog-import.js";
+import type { CatalogProduct } from "../src/catalog.js";
+const product: CatalogProduct = { presetId: "test-visa", providerCode: "TST", providerName: "Test", displayName: "Visa", network: "Visa", segment: "Classic", annualFee: 0, targetSpendForWaiver: null, imageUrl: null, benefits: [], sourceUrl: "https://example.test", sourceCheckedAt: "2026-07-11", active: true, sortOrder: 1, theme: { background: "#000", accent: "#fff" } };
+const memoryStore = () => { const values = new Map<string, CatalogProduct>(); return { values, store: { async findByPresetIds(ids: string[]) { return ids.flatMap((id) => values.has(id) ? [structuredClone(values.get(id)!)] : []); }, async upsert(value: CatalogProduct) { values.set(value.presetId, structuredClone(value)); } } }; };
+test("import defaults to dry-run and apply is idempotent", async () => { const { values, store } = memoryStore(); assert.deepEqual(await importCatalog([product], store), { create: 1, update: 0, unchanged: 0, conflict: 0, applied: false }); assert.equal(values.size, 0); assert.equal((await importCatalog([product], store, true)).create, 1); assert.deepEqual(await importCatalog([product], store, true), { create: 0, update: 0, unchanged: 1, conflict: 0, applied: true }); });
+test("production guard requires explicit override", () => { assert.throws(() => guardProductionImport({ NODE_ENV: "production" }), /refused/); assert.doesNotThrow(() => guardProductionImport({ NODE_ENV: "production", ALLOW_PRODUCTION_CATALOG_IMPORT: "true" })); });
