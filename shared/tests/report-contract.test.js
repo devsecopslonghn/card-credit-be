@@ -11,6 +11,7 @@ test("financial report contract keeps benefit KPIs on totals", () => {
     netAssets: 0,
     creditDebtBalance: 0,
     creditDebtLedger: [],
+    currentDebtLedger: [],
     debit: metric,
     cash: metric,
     eWallet: metric,

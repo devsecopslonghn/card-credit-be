@@ -8,8 +8,8 @@ import { CreditCardModel } from "../models/credit-card.js";
 import type { ServiceContext } from "./types/service-context.js";
 import { ApiError } from "../errors.js";
 import { StatementQueryService } from "./statement-query-service.js";
-import { creditDebtLedgerListSchema, financialReportSchema, reportDateRangeSchema } from "@card-credit/contracts";
-import type { FinancialReportDto, StatementDto } from "@card-credit/contracts";
+import { creditDebtLedgerListSchema, currentDebtLedgerListSchema, financialReportSchema, reportDateRangeSchema } from "@card-credit/contracts";
+import type { CurrentDebtLedgerItemDto, FinancialReportDto, StatementDto } from "@card-credit/contracts";
 
 type Range = { from: string; to: string };
 type Data = Record<string, unknown>;
@@ -85,6 +85,43 @@ const buildCreditDebtLedger = (range: Range, statements: StatementDto[], cards: 
         transactionCount: statement.summary.transactionCount,
       }];
     }));
+};
+
+const buildCurrentDebtLedger = (
+  statements: StatementDto[],
+  cards: Data[],
+  technicalAdjustmentsByCard: Map<string, number>,
+): CurrentDebtLedgerItemDto[] => {
+  const statementTotalsByCard = new Map<string, { statementOutstanding: number; nextPaymentDue: string | null }>();
+  for (const statement of statements) {
+    const outstanding = Math.max(0, Number(statement.summary.outstandingAmount ?? 0));
+    if (outstanding <= 0) continue;
+    const cardId = statement.cardId;
+    const current = statementTotalsByCard.get(cardId) ?? { statementOutstanding: 0, nextPaymentDue: null };
+    const nextPaymentDue = current.nextPaymentDue === null || statement.paymentDueDate < current.nextPaymentDue
+      ? statement.paymentDueDate
+      : current.nextPaymentDue;
+    statementTotalsByCard.set(cardId, {
+      statementOutstanding: current.statementOutstanding + outstanding,
+      nextPaymentDue,
+    });
+  }
+
+  return currentDebtLedgerListSchema.parse(cards.map((card) => {
+    const cardId = String(card._id);
+    const statement = statementTotalsByCard.get(cardId) ?? { statementOutstanding: 0, nextPaymentDue: null };
+    const technicalAdjustment = technicalAdjustmentsByCard.get(cardId) ?? 0;
+    return {
+      cardId,
+      providerName: String(card.providerName ?? ""),
+      displayName: String(card.displayName ?? ""),
+      owner: String(card.owner ?? "Tôi"),
+      statementOutstanding: statement.statementOutstanding,
+      technicalAdjustment,
+      currentDebt: Math.max(0, statement.statementOutstanding + technicalAdjustment),
+      nextPaymentDue: statement.nextPaymentDue,
+    };
+  })) as CurrentDebtLedgerItemDto[];
 };
 
 export class FinancialReportService {
@@ -216,10 +253,20 @@ export class FinancialReportService {
     const activeRealMoney = accounts.filter((account) => ["DEBIT", "CASH", "E_WALLET"].includes(String(account.type))).reduce((sum, account) => sum + Number(account.openingBalance ?? 0) + (allCashflowByAccount.get(String(account._id)) ?? 0), 0);
     totals.activeCashBalance = accounts.filter((account) => String(account.type) === "CASH").reduce((sum, account) => sum + Number(account.openingBalance ?? 0) + (allCashflowByAccount.get(String(account._id)) ?? 0), 0);
     totals.activeBankBalance = accounts.filter((account) => String(account.type) === "DEBIT").reduce((sum, account) => sum + Number(account.openingBalance ?? 0) + (allCashflowByAccount.get(String(account._id)) ?? 0), 0);
-    const technicalDebtDelta = allAccountTransactions
-      .filter((item) => String(item.accountType) === "CREDIT" && technicalTypes.has(String(item.transactionType)))
-      .reduce((sum, item) => sum + Number(item.technicalDelta ?? 0), 0);
-    totals.currentCardDebt = Math.max(0, allStatements.reduce((sum, statement) => sum + Math.max(0, Number(statement.summary?.outstandingAmount ?? 0)), 0) + technicalDebtDelta);
+    const creditCardIdByAccountId = new Map(
+      accounts
+        .filter((account) => String(account.type) === "CREDIT" && account.creditCardId)
+        .map((account) => [String(account._id), String(account.creditCardId)]),
+    );
+    const technicalAdjustmentsByCard = new Map<string, number>();
+    for (const item of allAccountTransactions) {
+      if (!technicalTypes.has(String(item.transactionType))) continue;
+      const cardId = creditCardIdByAccountId.get(String(item.accountId));
+      if (!cardId) continue;
+      technicalAdjustmentsByCard.set(cardId, (technicalAdjustmentsByCard.get(cardId) ?? 0) + Number(item.technicalDelta ?? 0));
+    }
+    const currentDebtLedger = buildCurrentDebtLedger(allStatements, ledgerCards, technicalAdjustmentsByCard);
+    totals.currentCardDebt = currentDebtLedger.reduce((sum, item) => sum + item.currentDebt, 0);
     totals.paidStatementDebt = allStatements.reduce((sum, statement) => sum + Math.max(0, Number(statement.summary?.paymentAmount ?? 0)), 0);
     const grossReceivableBySource = new Map<string, number>();
     const openReceivableBySource = new Map<string, number>();
@@ -263,6 +310,7 @@ export class FinancialReportService {
       realMoney: ["DEBIT", "CASH", "E_WALLET"].reduce((total, type) => { const value = byAccountType.get(type); if (value) { total.personalSpending += value.personalSpending; total.debitCashflow += value.debitCashflow; total.creditDebt += value.creditDebt; total.outstandingReceivable += value.outstandingReceivable; total.reimbursementReceived += value.reimbursementReceived; total.transactionCount += value.transactionCount; } return total; }, empty()),
       credit: byAccountType.get("CREDIT") ?? empty(),
       creditDebtLedger,
+      currentDebtLedger,
       byCategory: Object.fromEntries(byCategory),
       byAccount: Object.fromEntries([...byAccount.entries()].map(([id, value]) => [id, { name: accountNames.get(id) ?? "", ...value }])),
     }) as FinancialReportDto;

@@ -103,6 +103,55 @@ test("summary owner filter scopes ledger, cashback and fee sources by card refer
   assert.equal(transactionFind.mock.callCount(), 2);
 });
 
+test("summary exposes current debt independently from the report date range", async (t) => {
+  const cards = [
+    { _id: "507f1f77bcf86cd799439011", providerName: "Shinhan Bank", displayName: "Shinhan Supreme", owner: "Tôi" },
+    { _id: "507f1f77bcf86cd799439012", providerName: "VIB", displayName: "Max Card", owner: "Tôi" },
+  ];
+  const statements = [
+    {
+      ...statement,
+      id: "507f1f77bcf86cd799439031",
+      cardId: cards[0]!._id,
+      statementDate: "2026-10-01",
+      paymentDueDate: "2026-10-16",
+      summary: { ...statement.summary, statementAmount: 17_250_000, paymentAmount: 0, outstandingAmount: 17_250_000 },
+    },
+    {
+      ...statement,
+      id: "507f1f77bcf86cd799439032",
+      cardId: cards[1]!._id,
+      statementDate: "2026-09-30",
+      paymentDueDate: "2026-10-25",
+      summary: { ...statement.summary, statementAmount: 19_242_000, paymentAmount: 0, outstandingAmount: 19_242_000 },
+    },
+  ];
+  const accounts = [
+    { _id: "account-shinhan", name: "Credit: Shinhan Supreme", type: "CREDIT", creditCardId: cards[0]!._id, openingBalance: 0 },
+    { _id: "account-max", name: "Credit: Max Card", type: "CREDIT", creditCardId: cards[1]!._id, openingBalance: 0 },
+  ];
+  const transactions = [
+    { _id: "technical-shinhan", accountId: "account-shinhan", accountType: "CREDIT", transactionType: "BALANCE_ADJUSTMENT", technicalDelta: 368_372, amount: 368_372, ownership: "PERSONAL", personalSpending: 0, debitCashflow: 0, creditDebt: 0, outstandingReceivable: 0, reimbursementReceived: 0 },
+    { _id: "technical-max", accountId: "account-max", accountType: "CREDIT", transactionType: "OPENING_BALANCE_ADJUSTMENT", technicalDelta: -1_000, amount: 1_000, ownership: "PERSONAL", personalSpending: 0, debitCashflow: 0, creditDebt: 0, outstandingReceivable: 0, reimbursementReceived: 0 },
+  ];
+  t.mock.method(CreditCardModel, "find", () => chain(cards) as never);
+  t.mock.method(AccountModel, "find", () => chain(accounts) as never);
+  t.mock.method(FinancialTransactionModel, "find", () => chain(transactions) as never);
+  t.mock.method(MonthlyCardCashbackModel, "find", () => chain([]) as never);
+  t.mock.method(CardFeePaymentModel, "find", () => chain([]) as never);
+  t.mock.method(StatementQueryService, "list", async () => statements as never);
+
+  const result = await FinancialReportService.summary(context, { from: "2026-09-01", to: "2026-09-16" });
+
+  assert.equal(result.creditDebtLedger.length, 0);
+  assert.deepEqual(result.currentDebtLedger, [
+    { cardId: cards[0]!._id, providerName: "Shinhan Bank", displayName: "Shinhan Supreme", owner: "Tôi", statementOutstanding: 17_250_000, technicalAdjustment: 368_372, currentDebt: 17_618_372, nextPaymentDue: "2026-10-16" },
+    { cardId: cards[1]!._id, providerName: "VIB", displayName: "Max Card", owner: "Tôi", statementOutstanding: 19_242_000, technicalAdjustment: -1_000, currentDebt: 19_241_000, nextPaymentDue: "2026-10-25" },
+  ]);
+  assert.equal(result.totals.currentCardDebt, 36_859_372);
+  assert.equal(result.creditDebtBalance, 36_859_372);
+});
+
 test("summary keeps settled receivables audit-only and excludes technical cashflow", async (t) => {
   const transactions = [
     { _id: "settled-a", accountId: "credit", accountType: "CREDIT", transactionType: "EXPENSE", ownership: "PAID_FOR_OTHER", amount: 15_626_797, reimbursementExpected: 15_626_797, receivableStatus: "SETTLED", receivableSettledAmount: 15_626_797, personalSpending: 0, debitCashflow: 0, creditDebt: 0, outstandingReceivable: 99_999_999, reimbursementReceived: 0 },

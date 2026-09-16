@@ -101,6 +101,8 @@ export {
   financialReportSchema,
   creditDebtLedgerItemSchema,
   creditDebtLedgerListSchema,
+  currentDebtLedgerItemSchema,
+  currentDebtLedgerListSchema,
 } from "./report-contracts.js";
 export {
   feeCategorySchema,

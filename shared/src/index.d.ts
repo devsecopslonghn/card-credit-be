@@ -353,6 +353,8 @@ export declare const financialReportTotalsSchema: z.ZodObject<any>;
 export declare const financialReportSchema: z.ZodObject<any>;
 export declare const creditDebtLedgerItemSchema: z.ZodObject<any>;
 export declare const creditDebtLedgerListSchema: z.ZodArray<typeof creditDebtLedgerItemSchema>;
+export declare const currentDebtLedgerItemSchema: z.ZodObject<any>;
+export declare const currentDebtLedgerListSchema: z.ZodArray<typeof currentDebtLedgerItemSchema>;
 export declare const reportDateSchema: z.ZodString;
 export declare const reportDateRangeSchema: z.ZodObject<any>;
 export declare const reportQueryInputSchema: z.ZodObject<any>;
@@ -396,6 +398,7 @@ export type FinancialReportDto = {
   realMoney: FinancialReportMetricDto;
   credit: FinancialReportMetricDto;
   creditDebtLedger: CreditDebtLedgerItemDto[];
+  currentDebtLedger: CurrentDebtLedgerItemDto[];
   byCategory: Record<string, FinancialReportMetricDto>;
   byAccount: Record<string, FinancialReportMetricDto & { name: string }>;
 };
@@ -412,6 +415,16 @@ export type CreditDebtLedgerItemDto = {
   paidDebt: number;
   outstandingDebt: number;
   transactionCount: number;
+};
+export type CurrentDebtLedgerItemDto = {
+  cardId: string;
+  providerName: string;
+  displayName: string;
+  owner: string;
+  statementOutstanding: number;
+  technicalAdjustment: number;
+  currentDebt: number;
+  nextPaymentDue: string | null;
 };
 export declare const feeCategorySchema: z.ZodEnum<any>;
 export declare const feePaymentSchema: z.ZodObject<any>;

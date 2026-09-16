@@ -101,6 +101,21 @@ export const creditDebtLedgerItemSchema = z.strictObject({
 
 export const creditDebtLedgerListSchema = z.array(creditDebtLedgerItemSchema);
 
+/** Current debt is not date-range scoped: it includes every open statement and
+ * reconciled technical adjustment for the active card. */
+export const currentDebtLedgerItemSchema = z.strictObject({
+  cardId: z.string().min(1),
+  providerName: z.string(),
+  displayName: z.string(),
+  owner: z.string(),
+  statementOutstanding: safeNonNegativeInteger,
+  technicalAdjustment: safeInteger,
+  currentDebt: safeNonNegativeInteger,
+  nextPaymentDue: reportDateSchema.nullable(),
+});
+
+export const currentDebtLedgerListSchema = z.array(currentDebtLedgerItemSchema);
+
 export const financialReportSchema = z.object({
   range: reportDateRangeSchema,
   totals: financialReportTotalsSchema,
@@ -114,4 +129,5 @@ export const financialReportSchema = z.object({
   creditDebtLedger: creditDebtLedgerListSchema.default([]),
   byCategory: z.record(z.string(), financialReportMetricSchema),
   byAccount: z.record(z.string(), accountMetricSchema),
+  currentDebtLedger: currentDebtLedgerListSchema.default([]),
 });
