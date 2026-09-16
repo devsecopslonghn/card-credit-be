@@ -71,7 +71,7 @@ test("cash-flow query rejects malformed period before model reads", async (t) =>
   assert.equal(find.mock.callCount(), 0);
 });
 
-test("cash-flow REST adapter keeps envelope and compatibility card aliases", async (t) => {
+test("cash-flow REST adapter keeps the canonical card summary", async (t) => {
   t.mock.method(CashFlowQueryService, "list", async (ctx: ServiceContext, options: { period?: string; cardId?: string }) => {
     assert.equal(ctx.workspaceId, "workspace-a");
     assert.equal(options.period, "2026-08");
@@ -82,7 +82,7 @@ test("cash-flow REST adapter keeps envelope and compatibility card aliases", asy
   registerCashFlowRoutes(app, "01234567890123456789012345678901", users);
   const response = await app.inject({ url: "/api/cash-flow/monthly?period=2026-08", headers: { cookie: sessionCookie(signSession({ userId: "user-a", email: "user@example.test", role: "user", workspaceId: "workspace-a" }, "01234567890123456789012345678901")) } });
   assert.equal(response.statusCode, 200);
-  assert.equal(response.json().data[0].card.bank, "Bank");
-  assert.equal(response.json().data[0].card.name, "Visa");
+  assert.equal(response.json().data[0].card.providerName, "Bank");
+  assert.equal(response.json().data[0].card.displayName, "Visa");
   await app.close();
 });

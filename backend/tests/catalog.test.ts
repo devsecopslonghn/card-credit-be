@@ -12,7 +12,7 @@ const adminUser: AuthUser = { id: "u1", email: "admin@example.test", passwordHas
 const userUser: AuthUser = { id: "u2", email: "user@example.test", passwordHash: "", role: "user", workspaceId: "w1", displayName: "User", active: true, lockedAt: null };
 const authUsers = { findUserById: async (id: string) => id === adminUser.id ? adminUser : id === userUser.id ? userUser : null } as unknown as Pick<AuthRepository, "findUserById">;
 
-test("public catalog uses repository, hides inactive products, and omits legacy aliases", async () => {
+test("public catalog uses repository and hides inactive products", async () => {
   const app = buildApp({ isReady: () => true }, "silent", new InMemoryCatalogRepository([product, { ...product, presetId: "inactive-visa", sortOrder: 2, active: false }]), secret);
   const products = await app.inject({ url: "/api/card-catalog/products" }); assert.equal(products.statusCode, 200); assert.equal(products.json().data.length, 1); assert.equal(products.json().data[0].presetId, "test-visa"); assert.equal(products.json().data[0].id, undefined); assert.equal(products.json().data[0].bank, undefined);
   assert.equal((await app.inject({ url: "/api/card-catalog/products/inactive-visa" })).statusCode, 404); await app.close();

@@ -20,12 +20,7 @@
     "theme": {
       "background": "#047857",
       "accent": "#064e3b"
-    },
-    "id": "vcb-visa-platinum",
-    "bank": "VCB",
-    "bankName": "Vietcombank",
-    "name": "Visa Platinum",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "vcb-vibe-platinum",
@@ -48,12 +43,7 @@
     "theme": {
       "background": "#0f766e",
       "accent": "#134e4a"
-    },
-    "id": "vcb-vibe-platinum",
-    "bank": "VCB",
-    "bankName": "Vietcombank",
-    "name": "Vibe Platinum",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "techcombank-visa-signature",
@@ -76,12 +66,7 @@
     "theme": {
       "background": "#dc2626",
       "accent": "#7f1d1d"
-    },
-    "id": "techcombank-visa-signature",
-    "bank": "TCB",
-    "bankName": "Techcombank",
-    "name": "Visa Signature",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "techcombank-priority-visa-signature",
@@ -104,12 +89,7 @@
     "theme": {
       "background": "#991b1b",
       "accent": "#111827"
-    },
-    "id": "techcombank-priority-visa-signature",
-    "bank": "TCB",
-    "bankName": "Techcombank",
-    "name": "Priority Visa Signature",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "vpbank-stepup-mastercard",
@@ -132,12 +112,7 @@
     "theme": {
       "background": "#16a34a",
       "accent": "#1e3a8a"
-    },
-    "id": "vpbank-stepup-mastercard",
-    "bank": "VPB",
-    "bankName": "VPBank",
-    "name": "StepUp Cashback",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "vpbank-shopee-platinum",
@@ -160,12 +135,7 @@
     "theme": {
       "background": "#f97316",
       "accent": "#7c2d12"
-    },
-    "id": "vpbank-shopee-platinum",
-    "bank": "VPB",
-    "bankName": "VPBank",
-    "name": "Shopee Platinum",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "hsbc-cashback",
@@ -188,12 +158,7 @@
     "theme": {
       "background": "#111827",
       "accent": "#b91c1c"
-    },
-    "id": "hsbc-cashback",
-    "bank": "HSBC",
-    "bankName": "HSBC",
-    "name": "Cash Back",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "hsbc-livefree",
@@ -216,12 +181,7 @@
     "theme": {
       "background": "#374151",
       "accent": "#111827"
-    },
-    "id": "hsbc-livefree",
-    "bank": "HSBC",
-    "bankName": "HSBC",
-    "name": "LiveFree",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "hsbc-liveplus",
@@ -244,12 +204,7 @@
     "theme": {
       "background": "#7f1d1d",
       "accent": "#111827"
-    },
-    "id": "hsbc-liveplus",
-    "bank": "HSBC",
-    "bankName": "HSBC",
-    "name": "Live+",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "sacombank-visa-platinum-cashback",
@@ -272,12 +227,7 @@
     "theme": {
       "background": "#111827",
       "accent": "#d97706"
-    },
-    "id": "sacombank-visa-platinum-cashback",
-    "bank": "STB",
-    "bankName": "Sacombank",
-    "name": "Visa Platinum Cashback",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "sacombank-platinum-american-express",
@@ -300,12 +250,7 @@
     "theme": {
       "background": "#1e3a8a",
       "accent": "#0891b2"
-    },
-    "id": "sacombank-platinum-american-express",
-    "bank": "STB",
-    "bankName": "Sacombank",
-    "name": "Platinum American Express®",
-    "type": "American Express"
+    }
   },
   {
     "presetId": "sacombank-jcb-ultimate",
@@ -328,12 +273,7 @@
     "theme": {
       "background": "#4338ca",
       "accent": "#0f766e"
-    },
-    "id": "sacombank-jcb-ultimate",
-    "bank": "STB",
-    "bankName": "Sacombank",
-    "name": "JCB Ultimate",
-    "type": "JCB"
+    }
   },
   {
     "presetId": "sacombank-visa-signature",
@@ -356,12 +296,7 @@
     "theme": {
       "background": "#1d4ed8",
       "accent": "#1e3a8a"
-    },
-    "id": "sacombank-visa-signature",
-    "bank": "STB",
-    "bankName": "Sacombank",
-    "name": "Visa Signature",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "acb-visa-platinum",
@@ -384,12 +319,7 @@
     "theme": {
       "background": "#2563eb",
       "accent": "#1e40af"
-    },
-    "id": "acb-visa-platinum",
-    "bank": "ACB",
-    "bankName": "ACB",
-    "name": "Visa Platinum",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "acb-visa-signature",
@@ -412,12 +342,7 @@
     "theme": {
       "background": "#1e3a8a",
       "accent": "#0f172a"
-    },
-    "id": "acb-visa-signature",
-    "bank": "ACB",
-    "bankName": "ACB",
-    "name": "Visa Signature",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "mb-visa-modern-youth",
@@ -440,12 +365,7 @@
     "theme": {
       "background": "#1d4ed8",
       "accent": "#172554"
-    },
-    "id": "mb-visa-modern-youth",
-    "bank": "MBB",
-    "bankName": "MB Bank",
-    "name": "Visa Modern Youth",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "uob-prvi-miles",
@@ -468,12 +388,7 @@
     "theme": {
       "background": "#111827",
       "accent": "#3b82f6"
-    },
-    "id": "uob-prvi-miles",
-    "bank": "UOB",
-    "bankName": "UOB Vietnam",
-    "name": "PRVI Miles",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "uob-one",
@@ -496,12 +411,7 @@
     "theme": {
       "background": "#e5e7eb",
       "accent": "#64748b"
-    },
-    "id": "uob-one",
-    "bank": "UOB",
-    "bankName": "UOB Vietnam",
-    "name": "One",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "uob-world",
@@ -524,12 +434,7 @@
     "theme": {
       "background": "#1e3a8a",
       "accent": "#0ea5e9"
-    },
-    "id": "uob-world",
-    "bank": "UOB",
-    "bankName": "UOB Vietnam",
-    "name": "World",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "uob-lazada",
@@ -552,12 +457,7 @@
     "theme": {
       "background": "#4c1d95",
       "accent": "#ec4899"
-    },
-    "id": "uob-lazada",
-    "bank": "UOB",
-    "bankName": "UOB Vietnam",
-    "name": "Lazada UOB",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "vib-max-card",
@@ -580,12 +480,7 @@
     "theme": {
       "background": "#d1d5db",
       "accent": "#111827"
-    },
-    "id": "vib-max-card",
-    "bank": "VIB",
-    "bankName": "VIB",
-    "name": "Max Card",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "vib-family-link",
@@ -608,12 +503,7 @@
     "theme": {
       "background": "#0f766e",
       "accent": "#f59e0b"
-    },
-    "id": "vib-family-link",
-    "bank": "VIB",
-    "bankName": "VIB",
-    "name": "Family Link",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "vib-cash-back",
@@ -636,12 +526,7 @@
     "theme": {
       "background": "#111827",
       "accent": "#f59e0b"
-    },
-    "id": "vib-cash-back",
-    "bank": "VIB",
-    "bankName": "VIB",
-    "name": "Cash Back",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "vib-travel-elite",
@@ -664,12 +549,7 @@
     "theme": {
       "background": "#0f172a",
       "accent": "#38bdf8"
-    },
-    "id": "vib-travel-elite",
-    "bank": "VIB",
-    "bankName": "VIB",
-    "name": "Travel Élite",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "vib-ivy-card",
@@ -692,12 +572,7 @@
     "theme": {
       "background": "#06b6d4",
       "accent": "#1d4ed8"
-    },
-    "id": "vib-ivy-card",
-    "bank": "VIB",
-    "bankName": "VIB",
-    "name": "Ivy Card",
-    "type": "Visa"
+    }
   },
   {
     "presetId": "vib-rewards-unlimited",
@@ -720,12 +595,7 @@
     "theme": {
       "background": "#64748b",
       "accent": "#f8fafc"
-    },
-    "id": "vib-rewards-unlimited",
-    "bank": "VIB",
-    "bankName": "VIB",
-    "name": "Rewards Unlimited",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "vib-premier-boundless",
@@ -748,12 +618,7 @@
     "theme": {
       "background": "#0f172a",
       "accent": "#d4af37"
-    },
-    "id": "vib-premier-boundless",
-    "bank": "VIB",
-    "bankName": "VIB",
-    "name": "Premier Boundless",
-    "type": "Mastercard"
+    }
   },
   {
     "presetId": "shinhan-mylife-platinum",
@@ -765,17 +630,17 @@
     "annualFee": null,
     "targetSpendForWaiver": null,
     "imageUrl": null,
-    "benefits": ["Tích điểm thưởng cho chi tiêu hằng ngày"],
+    "benefits": [
+      "Tích điểm thưởng cho chi tiêu hằng ngày"
+    ],
     "sourceUrl": "https://shinhan.com.vn/vi/shinhan_card_category/the-tin-dung-ca-nhan.html",
     "sourceCheckedAt": "2026-08-07",
     "active": true,
     "sortOrder": 1001,
-    "theme": {"background": "#2563eb", "accent": "#0f172a"},
-    "id": "shinhan-mylife-platinum",
-    "bank": "SHB",
-    "bankName": "Shinhan Bank",
-    "name": "Shinhan MyLife hạng Bạch Kim",
-    "type": "Visa"
+    "theme": {
+      "background": "#2563eb",
+      "accent": "#0f172a"
+    }
   },
   {
     "presetId": "shinhan-supreme",
@@ -787,17 +652,18 @@
     "annualFee": null,
     "targetSpendForWaiver": null,
     "imageUrl": null,
-    "benefits": ["Tích điểm cho chi tiêu thiết yếu", "Tích điểm lên đến 12% theo điều kiện sản phẩm"],
+    "benefits": [
+      "Tích điểm cho chi tiêu thiết yếu",
+      "Tích điểm lên đến 12% theo điều kiện sản phẩm"
+    ],
     "sourceUrl": "https://shinhan.com.vn/vi/card/the-tin-dung-shinhan-supreme.html",
     "sourceCheckedAt": "2026-08-07",
     "active": true,
     "sortOrder": 1002,
-    "theme": {"background": "#7c3aed", "accent": "#1e1b4b"},
-    "id": "shinhan-supreme",
-    "bank": "SHB",
-    "bankName": "Shinhan Bank",
-    "name": "Shinhan Supreme",
-    "type": "Visa"
+    "theme": {
+      "background": "#7c3aed",
+      "accent": "#1e1b4b"
+    }
   },
   {
     "presetId": "shinhan-visa-signature",
@@ -809,17 +675,17 @@
     "annualFee": null,
     "targetSpendForWaiver": null,
     "imageUrl": null,
-    "benefits": ["Đặc quyền ẩm thực, nghỉ dưỡng, sân golf và phòng chờ sân bay"],
+    "benefits": [
+      "Đặc quyền ẩm thực, nghỉ dưỡng, sân golf và phòng chờ sân bay"
+    ],
     "sourceUrl": "https://shinhan.com.vn/vi/card/the-tin-dung-shinhan-visa-signature.html",
     "sourceCheckedAt": "2026-08-07",
     "active": true,
     "sortOrder": 1003,
-    "theme": {"background": "#111827", "accent": "#d4af37"},
-    "id": "shinhan-visa-signature",
-    "bank": "SHB",
-    "bankName": "Shinhan Bank",
-    "name": "Shinhan Visa Signature",
-    "type": "Visa"
+    "theme": {
+      "background": "#111827",
+      "accent": "#d4af37"
+    }
   },
   {
     "presetId": "shinhan-365-cashback-platinum",
@@ -831,17 +697,17 @@
     "annualFee": null,
     "targetSpendForWaiver": null,
     "imageUrl": null,
-    "benefits": ["Hoàn tiền cho các hoạt động mua sắm hằng ngày"],
+    "benefits": [
+      "Hoàn tiền cho các hoạt động mua sắm hằng ngày"
+    ],
     "sourceUrl": "https://shinhan.com.vn/vi/shinhan_card_category/the-tin-dung-ca-nhan.html",
     "sourceCheckedAt": "2026-08-07",
     "active": true,
     "sortOrder": 1004,
-    "theme": {"background": "#059669", "accent": "#064e3b"},
-    "id": "shinhan-365-cashback-platinum",
-    "bank": "SHB",
-    "bankName": "Shinhan Bank",
-    "name": "365 Cashback hạng Bạch Kim",
-    "type": "Visa"
+    "theme": {
+      "background": "#059669",
+      "accent": "#064e3b"
+    }
   },
   {
     "presetId": "shinhan-visa-hi-point-platinum",
@@ -853,17 +719,17 @@
     "annualFee": null,
     "targetSpendForWaiver": null,
     "imageUrl": null,
-    "benefits": ["Tích lũy điểm thưởng cho chi tiêu"],
+    "benefits": [
+      "Tích lũy điểm thưởng cho chi tiêu"
+    ],
     "sourceUrl": "https://shinhan.com.vn/vi/shinhan_card_category/the-tin-dung-ca-nhan.html",
     "sourceCheckedAt": "2026-08-07",
     "active": true,
     "sortOrder": 1005,
-    "theme": {"background": "#0e7490", "accent": "#164e63"},
-    "id": "shinhan-visa-hi-point-platinum",
-    "bank": "SHB",
-    "bankName": "Shinhan Bank",
-    "name": "Shinhan Visa Hi-Point hạng Bạch Kim",
-    "type": "Visa"
+    "theme": {
+      "background": "#0e7490",
+      "accent": "#164e63"
+    }
   },
   {
     "presetId": "shinhan-lotte-mart",
@@ -875,16 +741,16 @@
     "annualFee": null,
     "targetSpendForWaiver": null,
     "imageUrl": null,
-    "benefits": ["Tích điểm và ưu đãi khi mua sắm tại Lotte Mart"],
+    "benefits": [
+      "Tích điểm và ưu đãi khi mua sắm tại Lotte Mart"
+    ],
     "sourceUrl": "https://shinhan.com.vn/vi/shinhan_card_category/the-tin-dung-ca-nhan.html",
     "sourceCheckedAt": "2026-08-07",
     "active": true,
     "sortOrder": 1006,
-    "theme": {"background": "#dc2626", "accent": "#7f1d1d"},
-    "id": "shinhan-lotte-mart",
-    "bank": "SHB",
-    "bankName": "Shinhan Bank",
-    "name": "Shinhan - Lotte Mart",
-    "type": "Visa"
+    "theme": {
+      "background": "#dc2626",
+      "accent": "#7f1d1d"
+    }
   }
 ]

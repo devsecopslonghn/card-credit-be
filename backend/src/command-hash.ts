@@ -26,11 +26,3 @@ const normalizeJson = (value: unknown, seen = new Set<object>()): unknown => {
 
 export const canonicalJson = (value: unknown) => JSON.stringify(normalizeJson(value));
 export const canonicalPayloadHash = (value: unknown) => crypto.createHash("sha256").update(canonicalJson(value)).digest("hex");
-
-/** Hash format used by the pre-contract McpMutationModel receipts.
- *
- * Keep this read-only compatibility path until all existing receipts have
- * expired/been migrated. New receipts must always use canonicalPayloadHash.
- */
-export const legacyPayloadHash = (value: unknown) => crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
-export const payloadHashMatches = (stored: unknown, canonicalHash: string, legacyHash: string) => stored === canonicalHash || stored === legacyHash;

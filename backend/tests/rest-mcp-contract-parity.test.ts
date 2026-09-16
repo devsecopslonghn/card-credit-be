@@ -48,11 +48,10 @@ const callMcp = async (name: string, args: Record<string, unknown>) => {
 };
 
 const card = (id: string) => ({
-  id, presetId: "preset-a", providerCode: "BANK", providerName: "Bank", displayName: "Visa", network: "Visa", legacy: false,
+  id, presetId: "preset-a", providerCode: "BANK", providerName: "Bank", displayName: "Visa", network: "Visa",
   owner: "Tôi", imageUrl: null, annualFee: null, targetSpendForWaiver: null, annualFeeWaiverTarget: null,
   statementDay: null, paymentDueDays: null, cashbackCapAmount: null, cashbackCapPeriod: null, active: true,
-  reminderEnabled: true, reminderDaysBefore: [], reminderTimezone: null, reminderTime: null, statementDate: null,
-  paymentDueDate: null, amountDueThisMonth: null, isPaidThisMonth: null, monthlyData: [],
+  reminderEnabled: true, reminderDaysBefore: [], reminderTimezone: null, reminderTime: null,
 });
 
 test("REST and MCP cash-flow adapters parse to the same shared DTO", async (t) => {
@@ -80,7 +79,7 @@ test("REST and MCP duplicate-card adapters parse to the same shared DTO", async 
   const app = buildApp({ isReady: () => true }, "silent");
   registerCardRoutes(app, secret, fullUsers);
   const rest = await app.inject({ url: "/api/cards/duplicates", headers: { cookie: browserCookie } });
-  const restInput = rest.json().data.map((group: Record<string, unknown>) => ({ ...group, cards: (group.cards as Array<Record<string, unknown>>).map((item) => ({ ...item, id: item._id })) }));
+  const restInput = rest.json().data;
   const mcp = await callMcp("list_duplicate_cards", {});
   assert.deepEqual(cardDuplicateGroupListSchema.parse(restInput), cardDuplicateGroupListSchema.parse(mcp));
   assert.equal(service.mock.callCount(), 2);

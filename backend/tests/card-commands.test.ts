@@ -52,7 +52,7 @@ test("legacy create is rejected after the catalog-first cutover", async () => {
 
 test("card update command scopes workspace and ignores catalog snapshot fields", async () => {
   const cards = new FakeCards();
-  await cards.create({ _id: "507f1f77bcf86cd799439011", workspaceId: "workspace-a", providerName: "Original", bank: "TST", name: "Card", type: "Visa", owner: "Old", imageUrl: "/card.svg" });
+  await cards.create({ _id: "507f1f77bcf86cd799439011", workspaceId: "workspace-a", presetId: "test-visa", providerCode: "TST", providerName: "Original", displayName: "Card", network: "Visa", catalogVersion: "mongodb-v1", owner: "Old", imageUrl: "/card.svg" });
   const result = await CardCommandService.update(context, "507f1f77bcf86cd799439011", { owner: " New Owner ", providerName: "Tampered" }, cards);
   assert.equal(result.owner, "New Owner");
   assert.equal(result.providerName, "Original");

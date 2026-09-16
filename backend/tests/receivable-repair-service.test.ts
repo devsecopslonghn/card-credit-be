@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FinancialTransactionModel } from "../src/models/financial-transaction.js";
-import { McpMutationModel } from "../src/models/mcp-mutation.js";
 import { commandGuardService } from "../src/services/command-guard-service.js";
 import { ReceivableRepairService } from "../src/services/receivable-repair-service.js";
 import type { ServiceContext } from "../src/services/types/service-context.js";
@@ -27,7 +26,6 @@ test("receivable preview is status-only and has zero financial impact", async (t
 });
 
 test("receivable confirm only updates status and is guarded", async (t) => {
-  t.mock.method(McpMutationModel, "findOne", () => ({ session() { return this; }, lean: async () => null }) as never);
   let update: Record<string, unknown> | undefined;
   t.mock.method(FinancialTransactionModel, "findOneAndUpdate", ((_filter: unknown, change: Record<string, unknown>) => {
     update = change;

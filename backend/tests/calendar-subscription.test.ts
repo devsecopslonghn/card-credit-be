@@ -184,8 +184,11 @@ test("subscription feed batch-loads canonical statement amounts in one workspace
       _id: cardId,
       workspaceId: "workspace-a",
       userId: "user-1",
+      presetId: "test-card",
+      providerCode: "BANK",
       displayName: "Card A",
       providerName: "Bank A",
+      network: "Visa",
       owner: "Tôi",
       reminderTimezone: "Asia/Ho_Chi_Minh",
     }];

@@ -5,7 +5,7 @@ import { CreditCardModel } from "../src/models/credit-card.js";
 const uri = process.env.MONGODB_URI?.trim();
 if (!uri) throw new Error("MONGODB_URI is required");
 const apply = process.argv.includes("--apply");
-const unsetLegacy = { bank: "", name: "", type: "", monthlyData: "", statementDate: "", paymentDueDate: "", amountDueThisMonth: "", isPaidThisMonth: "" };
+const unsetLegacy = { legacy: "", bank: "", name: "", type: "", monthlyData: "", statementDate: "", paymentDueDate: "", amountDueThisMonth: "", isPaidThisMonth: "" };
 
 const normalize = (value: unknown) => typeof value === "string" ? value.trim().toLowerCase() : "";
 const matchProduct = (card: Record<string, unknown>, products: Awaited<ReturnType<typeof readCatalogFile>>) => {
@@ -18,7 +18,7 @@ const matchProduct = (card: Record<string, unknown>, products: Awaited<ReturnTyp
 await mongoose.connect(uri);
 try {
   const products = await readCatalogFile(catalogPath());
-  const cards = await CreditCardModel.find({}).lean() as Array<Record<string, unknown>>;
+  const cards = await CreditCardModel.collection.find({}).toArray() as Array<Record<string, unknown>>;
   const migrated: Array<{ id: string; presetId: string }> = [];
   const unresolved: Array<{ id: string; reason: string }> = [];
   for (const card of cards) {
@@ -29,22 +29,7 @@ try {
     }
     migrated.push({ id: String(card._id), presetId: product.presetId });
     if (apply) {
-      await CreditCardModel.updateOne(
-        { _id: card._id },
-        {
-          $set: {
-            presetId: product.presetId,
-            providerCode: product.providerCode,
-            providerName: product.providerName,
-            displayName: product.displayName,
-            network: product.network,
-            catalogVersion: "mongodb-v1",
-            legacy: false,
-          },
-          $unset: unsetLegacy,
-        },
-        { runValidators: true },
-      );
+      await CreditCardModel.collection.updateOne({ _id: card._id as mongoose.Types.ObjectId }, { $set: { presetId: product.presetId, providerCode: product.providerCode, providerName: product.providerName, displayName: product.displayName, network: product.network, catalogVersion: "mongodb-v1" }, $unset: unsetLegacy });
     }
   }
   console.log(JSON.stringify({ mode: apply ? "apply" : "dry-run", total: cards.length, migrated: migrated.length, unresolved, migratedCards: migrated }));

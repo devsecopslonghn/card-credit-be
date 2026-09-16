@@ -84,7 +84,7 @@ export class FinancialReportService {
       workspaceId: ctx.workspaceId,
       ...(filters.cardId ? { _id: filters.cardId } : {}),
       ...(filters.owner ? { owner: filters.owner.trim() } : {}),
-    }).select({ _id: 1, providerName: 1, displayName: 1, bank: 1, name: 1, owner: 1 }));
+    }).select({ _id: 1, providerName: 1, displayName: 1, owner: 1 }));
     if (filters.cardId && !cards.length) throw new ApiError(404, "CARD_NOT_FOUND", "Không tìm thấy thẻ.");
     const cardById = new Map(cards.map((card) => [String(card._id), card]));
     const statements = await StatementQueryService.list(ctx, {
@@ -98,8 +98,8 @@ export class FinancialReportService {
       return [{
         cardId: statement.cardId,
         statementId: statement.id,
-        providerName: String(card.providerName ?? card.bank ?? ""),
-        displayName: String(card.displayName ?? card.name ?? ""),
+        providerName: String(card.providerName ?? ""),
+        displayName: String(card.displayName ?? ""),
         owner: String(card.owner ?? "Tôi"),
         statementDate: statement.statementDate,
         paymentDueDate: statement.paymentDueDate,
@@ -218,8 +218,7 @@ export class FinancialReportService {
     const sourceStatementById = new Map<string, string>();
     for (const item of allAccountTransactions) {
       if (item.transactionType !== "EXPENSE" || item.ownership !== "PAID_FOR_OTHER") continue;
-      // reimbursementExpected is the gross claim. The retained impact field
-      // may be stale after historical repairs, so it is only a legacy fallback.
+      // reimbursementExpected is the authoritative gross claim for the source expense.
       const sourceId = String(item._id);
       // `outstandingReceivable` is a historical calculated impact and is not a
       // current receivable source. Only the source claim is valid for audit.

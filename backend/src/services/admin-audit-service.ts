@@ -1,5 +1,4 @@
 import { ApiError } from "../errors.js";
-import mongoose from "mongoose";
 import { AuthAuditLogModel } from "../models/auth.js";
 
 type Data = Record<string, unknown>;
@@ -10,9 +9,7 @@ export type AuditLogRepository = {
 };
 
 const auditLogRepository: AuditLogRepository = {
-  list: async (query, limit) => mongoose.connection.readyState === 0
-    ? await mongoose.connection.collection("authauditlogs").find(query).sort({ createdAt: -1, _id: -1 }).limit(limit).toArray() as Data[]
-    : await AuthAuditLogModel.find(query).sort({ createdAt: -1, _id: -1 }).limit(limit).lean() as Data[],
+  list: async (query, limit) => await AuthAuditLogModel.find(query).sort({ createdAt: -1, _id: -1 }).limit(limit).lean() as Data[],
 };
 
 const boundedLimit = (value: unknown) => Math.min(Math.max(Number.parseInt(typeof value === "string" ? value : "50", 10) || 50, 1), 100);

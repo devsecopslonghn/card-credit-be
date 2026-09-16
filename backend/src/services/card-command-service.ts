@@ -47,19 +47,12 @@ const createFromCatalog = (ctx: ServiceContext, body: Data, product: CatalogProd
   displayName: product.displayName,
   network: product.network,
   catalogVersion: "mongodb-v1",
-  legacy: false,
   owner: owner(body.owner),
   imageUrl: product.imageUrl ?? "/card-images/placeholder-card.svg",
   annualFee: product.annualFee,
   targetSpendForWaiver: product.targetSpendForWaiver ?? 0,
   annualFeeWaiverTarget: product.targetSpendForWaiver ?? null,
 });
-
-const createLegacy = (ctx: ServiceContext, body: Data) => {
-  void ctx;
-  void body;
-  throw new ApiError(400, "CARD_CATALOG_REQUIRED", "Tạo thẻ mới phải chọn presetId từ Card Catalog; contract legacy đã bị khóa.");
-};
 
 const updatePayload = (body: Data): Data => {
   const update: Data = {};
@@ -78,9 +71,8 @@ const updatePayload = (body: Data): Data => {
 
 export class CardCommandService {
   static async create(ctx: ServiceContext, body: Data, catalog: CatalogRepository, cards: CardWriteRepository = cardRepository): Promise<CardDto> {
-    const input = typeof body.presetId === "string"
-      ? createFromCatalog(ctx, body, productById(await catalog.listAllProducts(), body.presetId))
-      : createLegacy(ctx, body);
+    if (typeof body.presetId !== "string" || !body.presetId.trim()) throw new ApiError(400, "CARD_CATALOG_REQUIRED", "Tạo thẻ mới phải chọn presetId từ Card Catalog.");
+    const input = createFromCatalog(ctx, body, productById(await catalog.listAllProducts(), body.presetId));
     return cardDtoFromDocument(await cards.create(input));
   }
 

@@ -109,24 +109,15 @@ export type CatalogProviderDto = {
   providerName: string;
   products: CatalogProductDto[];
 };
-export declare const monthlyCardDataSchema: z.ZodObject<any>;
 export declare const cardPortfolioCardSchema: z.ZodObject<any>;
 export declare const cardPortfolioListSchema: z.ZodArray<typeof cardPortfolioCardSchema>;
-export type MonthlyCardDataDto = {
-  month: number;
-  spend: number;
-  cashback: number;
-  fee: number;
-  otherInterest: number;
-};
 export type CardDto = {
   id: string;
-  presetId: string | null;
-  providerCode: string | null;
-  providerName: string | null;
-  displayName: string | null;
-  network: string | null;
-  legacy: boolean;
+  presetId: string;
+  providerCode: string;
+  providerName: string;
+  displayName: string;
+  network: string;
   owner: string;
   imageUrl: string | null;
   annualFee: number | null;
@@ -141,11 +132,6 @@ export type CardDto = {
   reminderDaysBefore: number[];
   reminderTimezone: string | null;
   reminderTime: string | null;
-  statementDate: string | null;
-  paymentDueDate: string | null;
-  amountDueThisMonth: number | null;
-  isPaidThisMonth: boolean | null;
-  monthlyData: MonthlyCardDataDto[];
 };
 export type CardList = CardDto[];
 export declare const monthlyCashbackStatusSchema: z.ZodEnum<{

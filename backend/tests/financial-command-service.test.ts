@@ -5,13 +5,11 @@ import { FinancialTransactionService } from "../src/services/financial-transacti
 import { AccountModel } from "../src/models/account.js";
 import { FinancialTransactionModel } from "../src/models/financial-transaction.js";
 import { AccountService } from "../src/services/account-service.js";
-import { McpMutationModel } from "../src/models/mcp-mutation.js";
 import { commandGuardService, type CommandGuardSpec } from "../src/services/command-guard-service.js";
 import type { ServiceContext } from "../src/services/types/service-context.js";
 
 const context: ServiceContext = { workspaceId: "workspace-a", userId: "user-a", role: "user", channel: "browser", correlationId: "transaction-command-test" };
 const input = { accountId: "account-1", transactionDate: "2026-08-16", amount: 1000 };
-const query = <T>(value: T) => ({ session() { return this; }, lean: async () => value });
 
 test("technical adjustment preview exposes zero service fee and balance snapshot delta", async (t) => {
   t.mock.method(AccountModel, "findOne", () => ({ lean: async () => ({ _id: "cash", type: "CASH", openingBalance: 47_314_918 }) }) as never);
@@ -61,7 +59,6 @@ test("technical adjustment preview targets currentDebt for CREDIT accounts", asy
 });
 
 test("financial transaction command computes its hash and delegates to the persistent guard", async (t) => {
-  t.mock.method(McpMutationModel, "findOne", () => query(null) as never);
   let observed: CommandGuardSpec | undefined;
   t.mock.method(commandGuardService, "execute", async (_ctx: ServiceContext, spec: CommandGuardSpec) => {
     observed = spec;
@@ -75,10 +72,10 @@ test("financial transaction command computes its hash and delegates to the persi
   assert.match(observed?.payloadHash ?? "", /^[a-f0-9]{64}$/);
 });
 
-test("financial transaction command does not consult the legacy receipt store", async (t) => {
+test("financial transaction command fails before writing when the account is invalid", async (t) => {
   t.mock.method(commandGuardService, "execute", async (_ctx: ServiceContext, _spec: CommandGuardSpec, work: (session: mongoose.ClientSession) => Promise<unknown>) => work({} as mongoose.ClientSession));
   await assert.rejects(
-    () => FinancialTransactionService.create(context, input, { idempotencyKey: "legacy-transaction-1", endpointOrTool: "confirm_import_financial_transaction" }),
+    () => FinancialTransactionService.create(context, input, { idempotencyKey: "invalid-transaction-1", endpointOrTool: "confirm_import_financial_transaction" }),
     (error: unknown) => (error as { code?: string }).code === "INVALID_ACCOUNT_ID",
   );
 });

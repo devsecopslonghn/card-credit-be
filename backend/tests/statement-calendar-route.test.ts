@@ -40,11 +40,10 @@ const installModels = (options: { card?: object | null; statement?: object | nul
   CardQueryService.get = async () => {
     if (!card) throw new ApiError(404, "CARD_NOT_FOUND", "Không tìm thấy thẻ.");
     return {
-      id: cardId, presetId: null, providerCode: null, providerName: "Bank", displayName: "Platinum", network: null,
-      legacy: true, owner: "Tôi", imageUrl: null, annualFee: null, targetSpendForWaiver: null, annualFeeWaiverTarget: null,
+      id: cardId, presetId: "test-platinum", providerCode: "BANK", providerName: "Bank", displayName: "Platinum", network: "Visa",
+      owner: "Tôi", imageUrl: null, annualFee: null, targetSpendForWaiver: null, annualFeeWaiverTarget: null,
       statementDay: null, paymentDueDays: null, cashbackCapAmount: null, cashbackCapPeriod: null, active: true,
       reminderEnabled: true, reminderDaysBefore: [], reminderTimezone: "Asia/Ho_Chi_Minh", reminderTime: "08:00",
-      statementDate: null, paymentDueDate: null, amountDueThisMonth: null, isPaidThisMonth: null, monthlyData: [],
     } satisfies CardDto;
   };
   StatementQueryService.get = async () => {

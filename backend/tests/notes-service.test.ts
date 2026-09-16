@@ -30,7 +30,7 @@ test("notes service clamps oversized list reads before repository execution", as
   assert.equal(receivedLimit, 100);
 });
 
-test("notes service removes blank content and preserves legacy response", async () => {
+test("notes service removes blank content and preserves the response contract", async () => {
   let removed: { workspaceId: string; date: string } | undefined;
   const result = await NotesService.save(context, { date: "2026-07-11", content: "  " }, {
     upsert: async () => ({ workspaceId: "unexpected", date: "unexpected", content: "unexpected" }),

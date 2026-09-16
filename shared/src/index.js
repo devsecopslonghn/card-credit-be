@@ -45,7 +45,6 @@ export {
   catalogProviderListSchema,
 } from "./catalog-contracts.js";
 export {
-  monthlyCardDataSchema,
   cardPortfolioCardSchema,
   cardPortfolioListSchema,
 } from "./portfolio-contracts.js";

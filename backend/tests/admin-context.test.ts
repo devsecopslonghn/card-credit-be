@@ -7,6 +7,7 @@ import type { AuthRepository, AuthUser } from "../src/auth-repository.js";
 import { registerUserRoutes } from "../src/user-routes.js";
 import { AdminAuditService } from "../src/services/admin-audit-service.js";
 import { MongoAuthRepository } from "../src/auth-repository.js";
+import { AuthAuditLogModel, AuthUserModel } from "../src/models/auth.js";
 
 const secret = "01234567890123456789012345678901";
 const makeUser = (overrides: Partial<AuthUser> = {}): AuthUser => ({
@@ -25,22 +26,20 @@ test("admin user and audit routes use the revalidated admin context", async (t) 
     listUsers: async () => { listCalls += 1; return [admin, target]; },
     updateUser: async (id: string, update: object) => { updates.push({ id, update }); return id === target.id ? { ...target, ...update } : null; },
   } as unknown as AuthRepository;
-  const collection = t.mock.method(mongoose.connection, "collection", () => ({
-    find: (query: Record<string, unknown>) => {
+  const auditFind = t.mock.method(AuthAuditLogModel, "find", (query: Record<string, unknown>) => {
       assert.deepEqual(query, { event: "LOGIN", userId: "user-1", email: "user@example.test", "resource.type": "session", "resource.id": "r1" });
       return {
-        sort: (spec: Record<string, unknown>) => {
+        sort(spec: Record<string, unknown>) {
           assert.deepEqual(spec, { createdAt: -1, _id: -1 });
-          return {
-            limit: (limit: number) => {
-              assert.equal(limit, 8);
-              return { toArray: async () => [{ _id: "audit-1", event: "LOGIN" }] };
-            },
-          };
+          return this;
         },
+        limit(limit: number) {
+          assert.equal(limit, 8);
+          return this;
+        },
+        lean: async () => [{ _id: "audit-1", event: "LOGIN" }],
       };
-    },
-  }) as never);
+    }) as unknown as { mock: { callCount(): number } };
   const app = buildApp({ isReady: () => true }, "silent");
   registerUserRoutes(app, users, secret);
 
@@ -57,7 +56,7 @@ test("admin user and audit routes use the revalidated admin context", async (t) 
   const logs = await app.inject({ url: "/api/admin/audit-logs?event=LOGIN&userId=user-1&email=User%40Example.Test&resourceType=session&resourceId=r1&limit=7", headers });
   assert.equal(logs.statusCode, 200);
   assert.deepEqual(logs.json(), { logs: [{ id: "audit-1", event: "LOGIN" }], filters: { event: "LOGIN", userId: "user-1", email: "user@example.test", "resource.type": "session", "resource.id": "r1" }, limit: 7, nextCursor: null });
-  assert.equal(collection.mock.callCount(), 1);
+  assert.equal(auditFind.mock.callCount(), 1);
   await app.close();
 });
 
@@ -87,12 +86,16 @@ test("admin user repository exposes a stable bounded cursor page", async (t) => 
     { _id: new mongoose.Types.ObjectId("507f1f77bcf86cd799439011"), email: "a@example.test", passwordHash: "hash", role: "user", workspaceId: "workspace-a", displayName: "A", active: true, lockedAt: null },
     { _id: new mongoose.Types.ObjectId("507f1f77bcf86cd799439012"), email: "b@example.test", passwordHash: "hash", role: "user", workspaceId: "workspace-a", displayName: "B", active: true, lockedAt: null },
   ];
-  const find = t.mock.method(mongoose.connection, "collection", () => ({
-    find: (query: Record<string, unknown>) => {
-      assert.deepEqual(query, {});
-      return { sort: (spec: Record<string, unknown>) => { assert.deepEqual(spec, { email: 1, _id: 1 }); return { limit: (limit: number) => { assert.equal(limit, 2); return { toArray: async () => rows }; } }; } };
-    },
-  }) as never);
+  const find = t.mock.method(AuthUserModel, "find", (query: Record<string, unknown>) => {
+    assert.deepEqual(query, {});
+    const chain = {
+      select() { return this; },
+      sort(spec: Record<string, unknown>) { assert.deepEqual(spec, { email: 1, _id: 1 }); return this; },
+      limit(limit: number) { assert.equal(limit, 2); return this; },
+      lean: async () => rows,
+    };
+    return chain;
+  }) as unknown as { mock: { callCount(): number } };
   const page = await new MongoAuthRepository().listUsersPage({ limit: "1" });
   assert.deepEqual(page.users.map((user) => user.email), ["a@example.test"]);
   assert.equal(typeof page.nextCursor, "string");

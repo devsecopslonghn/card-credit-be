@@ -17,7 +17,6 @@ const card = (id: string, owner: string, presetId = "preset-a", active = true) =
   owner,
   active,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
-  monthlyData: [],
 });
 const query = <T>(value: T) => {
   const chain = { sort: () => chain, limit: () => chain, lean: async () => value };

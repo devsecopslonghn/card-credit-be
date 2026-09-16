@@ -9,8 +9,8 @@ import { MonthlyCardCashbackModel } from "../src/models/monthly-card-cashback.js
 import { CardLifecycleService } from "../src/services/card-lifecycle-service.js";
 
 const context = { workspaceId: "workspace-a", userId: "user-a", role: "user" as const, channel: "browser" as const, correlationId: "lifecycle-test" };
-const base = (id: string, monthlyData: unknown[] = []) => ({
-  _id: id, workspaceId: "workspace-a", presetId: "preset-a", providerCode: "BANK", providerName: "Bank", displayName: "Visa", network: "Visa", owner: "Alice", active: true, monthlyData,
+const base = (id: string) => ({
+  _id: id, workspaceId: "workspace-a", presetId: "preset-a", providerCode: "BANK", providerName: "Bank", displayName: "Visa", network: "Visa", owner: "Alice", active: true,
 });
 const query = (value: unknown) => ({ lean: async () => value });
 
@@ -23,8 +23,8 @@ test("card retirement is reversible and never deletes the card", async (t) => {
 });
 
 test("duplicate merge preserves referenced history by refusing unsafe source", async (t) => {
-  const source = base("507f1f77bcf86cd799439011", [{ month: 1, spend: 10 }]);
-  const target = base("507f1f77bcf86cd799439012", [{ month: 1, spend: 20 }]);
+  const source = base("507f1f77bcf86cd799439011");
+  const target = base("507f1f77bcf86cd799439012");
   const docs = [source, target];
   const cards = t.mock.method(CreditCardModel, "findOne", () => query(docs.shift()) as never);
   const update = t.mock.method(CreditCardModel, "findOneAndUpdate", () => ({ lean: async () => target }) as never);
@@ -38,11 +38,11 @@ test("duplicate merge preserves referenced history by refusing unsafe source", a
 });
 
 test("safe duplicate merge updates target and retires source in one transaction", async (t) => {
-  const source = base("507f1f77bcf86cd799439011", [{ month: 1, spend: 10 }]);
-  const target = base("507f1f77bcf86cd799439012", [{ month: 1, spend: 20 }]);
+  const source = base("507f1f77bcf86cd799439011");
+  const target = base("507f1f77bcf86cd799439012");
   const docs = [source, target];
   t.mock.method(CreditCardModel, "findOne", () => query(docs.shift()) as never);
-  const updatedTarget = { ...target, monthlyData: [{ month: 1, spend: 30, cashback: 0, fee: 0, otherInterest: 0 }] };
+  const updatedTarget = { ...target };
   t.mock.method(CreditCardModel, "findOneAndUpdate", () => ({ lean: async () => updatedTarget }) as never);
   const updateSource = t.mock.method(CreditCardModel, "updateOne", async () => ({ modifiedCount: 1 }) as never);
   t.mock.method(AccountModel, "countDocuments", async () => 0);
@@ -54,6 +54,6 @@ test("safe duplicate merge updates target and retires source in one transaction"
   const result = await CardLifecycleService.merge(context, source._id, target._id);
   assert.equal(result.retiredSourceId, source._id);
   assert.equal(result.targetCard.id, target._id);
-  assert.equal(result.targetCard.monthlyData[0]?.spend, 30);
+  assert.equal(result.targetCard.id, target._id);
   assert.equal(updateSource.mock.callCount(), 1);
 });

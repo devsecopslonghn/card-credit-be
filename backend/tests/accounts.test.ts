@@ -4,11 +4,9 @@ import mongoose from "mongoose";
 import { AccountService } from "../src/services/account-service.js";
 import { AccountModel } from "../src/models/account.js";
 import { CreditCardModel } from "../src/models/credit-card.js";
-import { McpMutationModel } from "../src/models/mcp-mutation.js";
 import { FinancialTransactionModel } from "../src/models/financial-transaction.js";
 import { StatementQueryService } from "../src/services/statement-query-service.js";
 import type { ServiceContext } from "../src/services/types/service-context.js";
-import { canonicalPayloadHash, legacyPayloadHash } from "../src/command-hash.js";
 import { commandGuardService, type CommandGuardSpec } from "../src/services/command-guard-service.js";
 
 const context: ServiceContext = {
@@ -28,7 +26,6 @@ const mockGuard = (t: TestContext) => {
 
 test("CREDIT account validates an active card in the same workspace before create", async (t) => {
   mockGuard(t);
-  t.mock.method(McpMutationModel, "findOne", () => query(null) as never);
   const cardFind = t.mock.method(CreditCardModel, "findOne", (filter: Record<string, unknown>) => {
     assert.deepEqual(filter, { _id: cardId, workspaceId: "workspace-a", active: { $ne: false } });
     return query({ _id: cardId, workspaceId: "workspace-a", active: true }) as never;
@@ -44,7 +41,6 @@ test("CREDIT account validates an active card in the same workspace before creat
 
 test("CREDIT account rejects missing, inactive or cross-workspace cards without creating", async (t) => {
   mockGuard(t);
-  t.mock.method(McpMutationModel, "findOne", () => query(null) as never);
   const cardFind = t.mock.method(CreditCardModel, "findOne", () => query(null) as never);
   const accountCreate = t.mock.method(AccountModel, "create", async () => { throw new Error("account create must not run"); });
 
@@ -55,7 +51,6 @@ test("CREDIT account rejects missing, inactive or cross-workspace cards without 
 
 test("malformed CREDIT card id fails closed before card or account reads", async (t) => {
   mockGuard(t);
-  t.mock.method(McpMutationModel, "findOne", () => query(null) as never);
   const cardFind = t.mock.method(CreditCardModel, "findOne");
   const accountCreate = t.mock.method(AccountModel, "create");
 
@@ -70,36 +65,8 @@ test("non-CREDIT card link remains a boundary error without card lookup", async 
   assert.equal(cardFind.mock.callCount(), 0);
 });
 
-test("idempotent account replay returns the stored result before card validation", async (t) => {
-  mockGuard(t);
-  const hash = canonicalPayloadHash(input);
-  const replayCardFind = t.mock.method(CreditCardModel, "findOne");
-  const replayCreate = t.mock.method(AccountModel, "create");
-  const stored = { id: "account-existing", name: input.name, type: "CREDIT", group: "DEBT", currency: "VND", active: true, creditCardId: cardId, openingBalance: 0, currentBalance: 0, currentDebt: 0 };
-  t.mock.method(McpMutationModel, "findOne", () => query({ payloadHash: hash, result: stored }) as never);
-
-  const result = await AccountService.create(context, input, invocation("idempotency-1"));
-  assert.deepEqual(result, stored);
-  assert.equal(replayCardFind.mock.callCount(), 0);
-  assert.equal(replayCreate.mock.callCount(), 0);
-});
-
-test("idempotent account replay accepts a legacy McpMutation payload hash", async (t) => {
-  mockGuard(t);
-  const replayCardFind = t.mock.method(CreditCardModel, "findOne");
-  const replayCreate = t.mock.method(AccountModel, "create");
-  const stored = { id: "account-legacy", name: input.name, type: "CREDIT", group: "DEBT", currency: "VND", active: true, creditCardId: cardId, openingBalance: 0, currentBalance: 0, currentDebt: 0 };
-  t.mock.method(McpMutationModel, "findOne", () => query({ payloadHash: legacyPayloadHash(input), result: stored }) as never);
-
-  const result = await AccountService.create(context, input, invocation("legacy-key"));
-  assert.deepEqual(result, stored);
-  assert.equal(replayCardFind.mock.callCount(), 0);
-  assert.equal(replayCreate.mock.callCount(), 0);
-});
-
 test("new account commands use the persistent guard and keep the adapter metadata", async (t) => {
   const input = { name: "Cash command", type: "CASH" as const, openingBalance: 1000 };
-  t.mock.method(McpMutationModel, "findOne", () => query(null) as never);
   const accountCreate = t.mock.method(AccountModel, "create", async (value: Record<string, unknown> | Array<Record<string, unknown>>) => {
     const record = Array.isArray(value) ? value[0] : value;
     return (Array.isArray(value) ? [{ _id: "507f1f77bcf86cd799439013", ...record }] : { _id: "507f1f77bcf86cd799439013", ...record }) as never;

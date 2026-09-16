@@ -34,33 +34,23 @@ const toUser = (doc: Record<string, unknown> | null): AuthUser | null => doc ? (
 }) : null;
 
 export class MongoAuthRepository implements AuthRepository {
-  private legacyUsers() { return mongoose.connection.collection("users"); }
-  private legacyTokens() { return mongoose.connection.collection("passwordresettokens"); }
-  private useLegacyTestAdapter() { return mongoose.connection.readyState === 0; }
-  async countUsers() { return this.useLegacyTestAdapter() ? this.legacyUsers().countDocuments() : AuthUserModel.countDocuments(); }
-  async findUserByEmail(email: string) { return this.useLegacyTestAdapter() ? toUser(await this.legacyUsers().findOne({ email })) : toUser(await AuthUserModel.findOne({ email }).select("+passwordHash").lean()); }
-  async findUserById(id: string) { return !mongoose.isValidObjectId(id) ? null : this.useLegacyTestAdapter() ? toUser(await this.legacyUsers().findOne({ _id: new mongoose.Types.ObjectId(id) })) : toUser(await AuthUserModel.findOne({ _id: new mongoose.Types.ObjectId(id) }).select("+passwordHash").lean()); }
+  async countUsers() { return AuthUserModel.countDocuments(); }
+  async findUserByEmail(email: string) { return toUser(await AuthUserModel.findOne({ email }).select("+passwordHash").lean()); }
+  async findUserById(id: string) { return !mongoose.isValidObjectId(id) ? null : toUser(await AuthUserModel.findOne({ _id: new mongoose.Types.ObjectId(id) }).select("+passwordHash").lean()); }
   async createUser(user: Omit<AuthUser, "id">) {
     const normalized = { ...user, sessionVersion: user.sessionVersion ?? 0 };
-    if (this.useLegacyTestAdapter()) { const result = await this.legacyUsers().insertOne({ ...normalized, createdAt: new Date(), updatedAt: new Date() }); return { ...normalized, id: String(result.insertedId) }; }
     const result = await AuthUserModel.create(normalized);
     return { ...normalized, id: String(result._id) };
   }
   async upsertUser(user: Omit<AuthUser, "id">) {
-    if (this.useLegacyTestAdapter()) {
-      const current = await this.legacyUsers().findOne({ email: user.email });
-      const securityChanged = Boolean(current && (current.passwordHash !== user.passwordHash || current.role !== user.role || current.workspaceId !== user.workspaceId));
-      await this.legacyUsers().updateOne({ email: user.email }, { $set: { ...user, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date(), lastLoginAt: null, sessionVersion: 0 }, ...(securityChanged ? { $inc: { sessionVersion: 1 } } : {}) }, { upsert: true });
-      return (await this.findUserByEmail(user.email))!;
-    }
     const current = await AuthUserModel.findOne({ email: user.email }).select("+passwordHash").lean();
     const securityChanged = Boolean(current && (current.passwordHash !== user.passwordHash || current.role !== user.role || current.workspaceId !== user.workspaceId));
     await AuthUserModel.updateOne({ email: user.email }, { $set: { ...user }, $setOnInsert: { lastLoginAt: null, sessionVersion: 0 }, ...(securityChanged ? { $inc: { sessionVersion: 1 } } : {}) }, { upsert: true, runValidators: true });
     return (await this.findUserByEmail(user.email))!;
   }
-  async updatePassword(id: string, passwordHash: string) { if (this.useLegacyTestAdapter()) return void await this.legacyUsers().updateOne({ _id: new mongoose.Types.ObjectId(id) }, { $set: { passwordHash, passwordChangedAt: new Date(), lastLoginAt: null, updatedAt: new Date() }, $inc: { sessionVersion: 1 } }); await AuthUserModel.updateOne({ _id: new mongoose.Types.ObjectId(id) }, { $set: { passwordHash, passwordChangedAt: new Date(), lastLoginAt: null }, $inc: { sessionVersion: 1 } }, { runValidators: true }); }
-  async touchLogin(id: string) { if (this.useLegacyTestAdapter()) return void await this.legacyUsers().updateOne({ _id: new mongoose.Types.ObjectId(id) }, { $set: { lastLoginAt: new Date(), updatedAt: new Date() } }); await AuthUserModel.updateOne({ _id: new mongoose.Types.ObjectId(id) }, { $set: { lastLoginAt: new Date() } }); }
-  async listUsers() { return (await (this.useLegacyTestAdapter() ? this.legacyUsers().find().sort({ email: 1 }).toArray() : AuthUserModel.find().select("+passwordHash").sort({ email: 1 }).lean())).map(toUser).filter((user): user is AuthUser => user !== null); }
+  async updatePassword(id: string, passwordHash: string) { await AuthUserModel.updateOne({ _id: new mongoose.Types.ObjectId(id) }, { $set: { passwordHash, passwordChangedAt: new Date(), lastLoginAt: null }, $inc: { sessionVersion: 1 } }, { runValidators: true }); }
+  async touchLogin(id: string) { await AuthUserModel.updateOne({ _id: new mongoose.Types.ObjectId(id) }, { $set: { lastLoginAt: new Date() } }); }
+  async listUsers() { return (await AuthUserModel.find().select("+passwordHash").sort({ email: 1 }).lean()).map(toUser).filter((user): user is AuthUser => user !== null); }
   async listUsersPage(options: UserListPageOptions = {}) {
     const limit = Math.min(Math.max(Number.parseInt(options.limit ?? "100", 10) || 100, 1), 100);
     const query: Record<string, unknown> = {};
@@ -73,15 +63,15 @@ export class MongoAuthRepository implements AuthRepository {
         throw new ApiError(400, "INVALID_USER_CURSOR", "Cursor người dùng không hợp lệ.");
       }
     }
-    const rows = await (this.useLegacyTestAdapter() ? this.legacyUsers().find(query).sort({ email: 1, _id: 1 }).limit(limit + 1).toArray() : AuthUserModel.find(query).select("+passwordHash").sort({ email: 1, _id: 1 }).limit(limit + 1).lean());
+    const rows = await AuthUserModel.find(query).select("+passwordHash").sort({ email: 1, _id: 1 }).limit(limit + 1).lean();
     const hasNext = rows.length > limit;
     const page = hasNext ? rows.slice(0, limit) : rows;
     const last = page[page.length - 1];
     const nextCursor = hasNext && last ? Buffer.from(JSON.stringify({ email: last.email, id: String(last._id) }), "utf8").toString("base64url") : null;
     return { users: page.map(toUser).filter((user): user is AuthUser => user !== null), nextCursor, limit };
   }
-  async updateUser(id: string, update: Partial<Pick<AuthUser, "displayName" | "role" | "workspaceId">>) { const securityChanged = update.role !== undefined || update.workspaceId !== undefined; if (this.useLegacyTestAdapter()) return toUser(await this.legacyUsers().findOneAndUpdate({ _id: new mongoose.Types.ObjectId(id) }, { $set: { ...update, updatedAt: new Date() }, ...(securityChanged ? { $inc: { sessionVersion: 1 } } : {}) }, { returnDocument: "after" })); return toUser(await AuthUserModel.findOneAndUpdate({ _id: new mongoose.Types.ObjectId(id) }, { $set: { ...update }, ...(securityChanged ? { $inc: { sessionVersion: 1 } } : {}) }, { returnDocument: "after", runValidators: true }).select("+passwordHash").lean()); }
-  async createResetToken(token: ResetToken) { if (this.useLegacyTestAdapter()) return void await this.legacyTokens().insertOne({ ...token, createdAt: new Date(), updatedAt: new Date() }); await PasswordResetTokenModel.create(token); }
-  async findResetToken(tokenHash: string, now: Date) { return (this.useLegacyTestAdapter() ? await this.legacyTokens().findOne({ tokenHash, usedAt: null, expiresAt: { $gt: now } }) : await PasswordResetTokenModel.findOne({ tokenHash, usedAt: null, expiresAt: { $gt: now } }).select("+tokenHash").lean()) as ResetToken | null; }
-  async consumeResetTokens(userId: string, now: Date) { if (this.useLegacyTestAdapter()) return void await this.legacyTokens().updateMany({ userId, usedAt: null }, { $set: { usedAt: now, updatedAt: now } }); await PasswordResetTokenModel.updateMany({ userId, usedAt: null }, { $set: { usedAt: now } }); }
+  async updateUser(id: string, update: Partial<Pick<AuthUser, "displayName" | "role" | "workspaceId">>) { const securityChanged = update.role !== undefined || update.workspaceId !== undefined; return toUser(await AuthUserModel.findOneAndUpdate({ _id: new mongoose.Types.ObjectId(id) }, { $set: { ...update }, ...(securityChanged ? { $inc: { sessionVersion: 1 } } : {}) }, { returnDocument: "after", runValidators: true }).select("+passwordHash").lean()); }
+  async createResetToken(token: ResetToken) { await PasswordResetTokenModel.create(token); }
+  async findResetToken(tokenHash: string, now: Date) { return await PasswordResetTokenModel.findOne({ tokenHash, usedAt: null, expiresAt: { $gt: now } }).select("+tokenHash").lean() as ResetToken | null; }
+  async consumeResetTokens(userId: string, now: Date) { await PasswordResetTokenModel.updateMany({ userId, usedAt: null }, { $set: { usedAt: now } }); }
 }

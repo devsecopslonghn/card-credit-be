@@ -76,7 +76,6 @@ test("summary reads benefit sources once, keeps ledger groups stable and avoids 
   assert.deepEqual(cashbackFind.mock.calls[0]?.arguments[0], { workspaceId: "workspace-a", period: { $gte: "2026-07", $lte: "2026-07" } });
   assert.deepEqual(feeFind.mock.calls[0]?.arguments[0], { workspaceId: "workspace-a", paymentDate: { $gte: "2026-07-01", $lte: "2026-07-31" }, category: { $in: ["ANNUAL_CARD_FEE", "MANAGEMENT_FEE", "OTHER_FEE"] } });
   assert.equal(categoryFind.mock.callCount(), 0);
-  assert.equal(JSON.stringify(result).includes("monthlyData"), false);
 });
 
 test("summary owner filter scopes ledger, cashback and fee sources by card references", async (t) => {

@@ -2,31 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import mongoose from "mongoose";
 import { MongoAuthRepository } from "../src/auth-repository.js";
+import { AuthUserModel } from "../src/models/auth.js";
 
 const userId = "507f1f77bcf86cd799439011";
 
 test("MongoAuthRepository atomically bumps sessionVersion for security changes", async (t) => {
   const calls: Array<{ method: string; args: unknown[] }> = [];
-  const users = {
-    updateOne: async (...args: unknown[]) => {
-      calls.push({ method: "updateOne", args });
-      return { acknowledged: true, modifiedCount: 1 };
-    },
-    findOne: async () => ({
+  t.mock.method(AuthUserModel, "updateOne", async (...args: unknown[]) => {
+    calls.push({ method: "updateOne", args });
+    return { acknowledged: true, modifiedCount: 1 } as never;
+  });
+  t.mock.method(AuthUserModel, "findOneAndUpdate", (...args: unknown[]) => {
+    calls.push({ method: "findOneAndUpdate", args });
+    return {
+    select() { return this; },
+    lean: async () => ({
       _id: new mongoose.Types.ObjectId(userId), email: "user@example.test", passwordHash: "hash",
-      role: "user", workspaceId: "workspace-a", displayName: "User", active: true, lockedAt: null,
-      sessionVersion: 2,
+      role: "admin", workspaceId: "workspace-b", displayName: "User", active: true, lockedAt: null,
+      sessionVersion: 3,
     }),
-    findOneAndUpdate: async (...args: unknown[]) => {
-      calls.push({ method: "findOneAndUpdate", args });
-      return {
-        _id: new mongoose.Types.ObjectId(userId), email: "user@example.test", passwordHash: "hash",
-        role: "admin", workspaceId: "workspace-b", displayName: "User", active: true, lockedAt: null,
-        sessionVersion: 3,
-      };
-    },
-  };
-  t.mock.method(mongoose.connection, "collection", () => users as never);
+    } as never;
+  });
 
   const repository = new MongoAuthRepository();
   await repository.updatePassword(userId, "new-hash");
