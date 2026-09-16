@@ -4,8 +4,8 @@
 
 - Bytebase instance: `mongodb-atlas-jrcf`.
 - Database: `test`.
-- Current Bytebase state: database `test` is attached to the `default` project; no dedicated Card Credit project exists yet.
-- Proposed project key: `card-credit-db`.
+- Current Bytebase state: project `card-credit-db` exists as `projects/card-credit-db-hvjd`, and database `test` is attached to it.
+- MCP database resource: `instances/mongodb-atlas-jrcf/databases/test`.
 - This plan is read-only until the preflight checks pass. No production write was run while preparing it.
 
 ## Current decision
@@ -29,7 +29,7 @@ The read-only inspection of `mongodb-atlas-jrcf` / `test` found:
 
 ## Safe execution order
 
-1. In Bytebase, create project `card-credit-db` and attach `projects/card-credit-db/instances/mongodb-atlas-jrcf/databases/test` to the appropriate environment. Keep the existing `default` assignment until the project attachment is verified.
+1. Completed: Bytebase project `projects/card-credit-db-hvjd` owns `instances/mongodb-atlas-jrcf/databases/test` in the develop environment; verify this assignment before each rollout.
 2. Take the MongoDB Atlas snapshot/export required by the operational policy. Record counts for `creditcards`, `accounts`, `cardstatements`, `financialtransactions`, `commandreceipts`, `commandpreviews`, `commandaudits` and `mcpmutations`.
 3. Run `npm run migrate:canonical-cards` without `--apply` from the exact backend commit being deployed. The command now reports `mode: blocked` for `--apply` when any card lacks a workspace, so it cannot partially rewrite the collection.
 4. Resolve the four workspace-less cards explicitly. Assign a workspace only when an authoritative owner/reference proves it; otherwise export and archive/remove them in a separately reviewed cleanup change.
