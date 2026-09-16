@@ -27,6 +27,7 @@ The read-only inspection of `mongodb-atlas-jrcf` / `test` found:
 - `mcpmutations` still contains 17 historical rows although runtime idempotency is now owned by `commandreceipts`, `commandpreviews` and `commandaudits`.
 - The four workspace-less cards were confirmed as test data and archived in `creditcardarchives`; their exact source documents were removed from `creditcards` only after the zero-reference preflight passed. The cleanup command is idempotent.
 - The remaining 10 cards were migrated to the canonical catalog snapshot and all legacy card fields were removed. Post-migration verification found zero canonical-field gaps and zero orphan card references.
+- Command-guard and data-integrity index checks were applied and verified with zero duplicate receipt, preview, payment, device or card groups.
 - `cardproducts` contains 33 global catalog rows; `banks` and `cardtypes` are empty global master-data collections. The required card and financial indexes already exist.
 
 ## Safe execution order
@@ -38,7 +39,7 @@ The read-only inspection of `mongodb-atlas-jrcf` / `test` found:
 5. Completed preflight: the canonical-card dry-run now reports 10 cards and `unresolved: []`, with every remaining card having a workspace and exactly one catalog product.
 6. Completed: the canonical migration applied to all 10 remaining cards. It wrote the canonical catalog snapshot, normalized `workspaceId`, and unset `legacy`, `bank`, `name`, `type`, `monthlyData`, `statementDate`, `paymentDueDate`, `amountDueThisMonth` and `isPaidThisMonth` in one deterministic pass.
 7. Completed: post-migration verification found 10 canonical cards, no legacy keys, no missing workspace/catalog fields, and zero orphan references from statements, cashbacks, fees or accounts.
-8. Run `npm run ensure:command-guard-indexes` and `npm run ensure:data-integrity-indexes`, then smoke-test REST and MCP with the same workspace. Keep `mcpmutations` read-only until its export/audit is complete; remove it in a separate approved cleanup plan because it is obsolete data, not a runtime compatibility path.
+8. Completed: command-guard and data-integrity indexes were applied and verified. Smoke-test REST and MCP with the same workspace. Keep `mcpmutations` read-only until its export/audit is complete; remove it in a separate approved cleanup plan because it is obsolete data, not a runtime compatibility path.
 9. Deploy the canonical runtime only after verification. Do not make migration an application startup side effect.
 
 The migration is intentionally not an automatic startup mutation. A deployment must not silently guess a card identity, workspace owner, or rewrite financial history.
