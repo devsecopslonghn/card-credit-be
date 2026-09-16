@@ -19,20 +19,28 @@ await mongoose.connect(uri);
 try {
   const products = await readCatalogFile(catalogPath());
   const cards = await CreditCardModel.collection.find({}).toArray() as Array<Record<string, unknown>>;
-  const migrated: Array<{ id: string; presetId: string }> = [];
+  const candidates: Array<{ card: Record<string, unknown>; presetId: string; workspaceId: string }> = [];
   const unresolved: Array<{ id: string; reason: string }> = [];
   for (const card of cards) {
+    const workspaceId = typeof card.workspaceId === "string" ? card.workspaceId.trim() : "";
+    if (!workspaceId) {
+      unresolved.push({ id: String(card._id), reason: "workspaceId-missing" });
+      continue;
+    }
     const product = typeof card.presetId === "string" ? products.find((candidate) => candidate.presetId === card.presetId) : matchProduct(card, products);
     if (!product) {
       unresolved.push({ id: String(card._id), reason: typeof card.presetId === "string" ? "presetId-not-in-catalog" : "legacy-fields-did-not-match-one-catalog-product" });
       continue;
     }
-    migrated.push({ id: String(card._id), presetId: product.presetId });
-    if (apply) {
-      await CreditCardModel.collection.updateOne({ _id: card._id as mongoose.Types.ObjectId }, { $set: { presetId: product.presetId, providerCode: product.providerCode, providerName: product.providerName, displayName: product.displayName, network: product.network, catalogVersion: "mongodb-v1" }, $unset: unsetLegacy });
+    candidates.push({ card, presetId: product.presetId, workspaceId });
+  }
+  if (apply && !unresolved.length) {
+    for (const { card, presetId, workspaceId } of candidates) {
+      const product = products.find((candidate) => candidate.presetId === presetId)!;
+      await CreditCardModel.collection.updateOne({ _id: card._id as mongoose.Types.ObjectId }, { $set: { workspaceId, presetId: product.presetId, providerCode: product.providerCode, providerName: product.providerName, displayName: product.displayName, network: product.network, catalogVersion: "mongodb-v1" }, $unset: unsetLegacy });
     }
   }
-  console.log(JSON.stringify({ mode: apply ? "apply" : "dry-run", total: cards.length, migrated: migrated.length, unresolved, migratedCards: migrated }));
+  console.log(JSON.stringify({ mode: apply ? (unresolved.length ? "blocked" : "apply") : "dry-run", total: cards.length, candidates: candidates.length, migrated: apply && !unresolved.length ? candidates.length : 0, unresolved, migratedCards: candidates.map(({ card, presetId }) => ({ id: String(card._id), presetId })) }));
   if (unresolved.length) process.exitCode = 2;
 } finally {
   await mongoose.disconnect();
