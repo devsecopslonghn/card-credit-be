@@ -1,8 +1,7 @@
 import { settleReceivableInputSchema } from "@card-credit/contracts";
 import { FinancialTransactionModel } from "../models/financial-transaction.js";
 import { ApiError } from "../errors.js";
-import { canonicalPayloadHash, legacyPayloadHash, payloadHashMatches } from "../command-hash.js";
-import { McpMutationModel } from "../models/mcp-mutation.js";
+import { canonicalPayloadHash } from "../command-hash.js";
 import { commandGuardService, type CommandInvocation } from "./command-guard-service.js";
 import type { ServiceContext } from "./types/service-context.js";
 
@@ -32,10 +31,7 @@ export class ReceivableRepairService {
     const input = settleReceivableInputSchema.parse(raw) as Input;
     const operation = "settle_receivable";
     const payloadHash = canonicalPayloadHash(input);
-    const legacyHash = legacyPayloadHash(input);
     return commandGuardService.execute(ctx, { operation, idempotencyKey: invocation.idempotencyKey.trim(), payloadHash, endpointOrTool: invocation.endpointOrTool, previewId: invocation.previewId, confirmationTokenHash: invocation.confirmationTokenHash, previewPayloadHash: invocation.previewPayloadHash, resource: { type: "receivable", receivableId: input.receivableId ?? input.transactionId ?? "", amount: input.amount, beforeStatus: "OPEN", afterStatus: "SETTLED", reason: input.reason } }, async (session) => {
-      const existing = await McpMutationModel.findOne({ workspaceId: ctx.workspaceId, operation, idempotencyKey: invocation.idempotencyKey.trim() }).session(session).lean();
-      if (existing) { if (!payloadHashMatches(existing.payloadHash, payloadHash, legacyHash)) throw new ApiError(409, "IDEMPOTENCY_PAYLOAD_MISMATCH", "Idempotency key đã dùng cho payload khác."); return existing.result; }
       const expectedVersion = input.expectedVersion ?? 0;
       const filter: Record<string, unknown> = { ...sourceFilter(ctx, input), receivableStatus: { $in: [null, "OPEN"] }, $or: [{ receivableVersion: expectedVersion }, ...(expectedVersion === 0 ? [{ receivableVersion: { $exists: false } }] : [])] };
       const updated = await FinancialTransactionModel.findOneAndUpdate(filter, { $set: { receivableStatus: "SETTLED", receivableSettledAmount: input.amount, receivableSettledAt: new Date(), receivableSettlementReason: input.reason }, $inc: { receivableVersion: 1 } }, { new: true, session }).lean();

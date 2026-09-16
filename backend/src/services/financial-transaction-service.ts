@@ -7,10 +7,9 @@ import { CardStatementModel } from "../models/card-statement.js";
 import { ApiError } from "../errors.js";
 import { idOf, plain, statementPeriod, validDate } from "../statement-domain.js";
 import type { ServiceContext } from "./types/service-context.js";
-import { McpMutationModel } from "../models/mcp-mutation.js";
 import { FINANCIAL_TRANSACTION_DEFAULT_LIMIT, FINANCIAL_TRANSACTION_MAX_LIMIT, financialTransactionListSchema, financialTransactionSchema } from "@card-credit/contracts";
 import type { CreateFinancialTransactionInput as SharedCreateFinancialTransactionInput, CreateFinancialTransactionBatchInput as SharedCreateFinancialTransactionBatchInput, UpdateFinancialTransactionInput, FinancialTransactionDto } from "@card-credit/contracts";
-import { canonicalPayloadHash, legacyPayloadHash, payloadHashMatches } from "../command-hash.js";
+import { canonicalPayloadHash } from "../command-hash.js";
 import { commandGuardService, type CommandInvocation } from "./command-guard-service.js";
 import { AccountService } from "./account-service.js";
 
@@ -92,7 +91,6 @@ export class FinancialTransactionService {
     if (input.items.some((item) => item.transactionType === "STATEMENT_PAYMENT")) throw new ApiError(409, "STATEMENT_PAYMENT_COMMAND_REQUIRED", "Thanh toán sao kê phải đi qua command thanh toán sao kê.");
     const operation = "import_financial_transaction_batch";
     const payloadHash = canonicalPayloadHash(input);
-    const legacyHash = legacyPayloadHash(input);
     const idempotencyKey = invocation.idempotencyKey.trim();
     return commandGuardService.execute(ctx, {
       operation,
@@ -104,11 +102,6 @@ export class FinancialTransactionService {
       previewPayloadHash: invocation.previewPayloadHash,
       resource: { type: "financial_transaction_batch" },
     }, async (session) => {
-      const existing = await McpMutationModel.findOne({ workspaceId: ctx.workspaceId, operation, idempotencyKey }).session(session).lean();
-      if (existing) {
-        if (!payloadHashMatches(existing.payloadHash, payloadHash, legacyHash)) throw new ApiError(409, "IDEMPOTENCY_PAYLOAD_MISMATCH", "Idempotency key đã dùng cho payload khác.");
-        return existing.result;
-      }
       const items = [];
       for (const item of input.items) items.push(await this.createInternal(ctx, item, session));
       return { count: items.length, items };
@@ -119,7 +112,6 @@ export class FinancialTransactionService {
     if (input.transactionType === "STATEMENT_PAYMENT") throw new ApiError(409, "STATEMENT_PAYMENT_COMMAND_REQUIRED", "Thanh toán sao kê phải đi qua command thanh toán sao kê.");
     const operation = "import_financial_transaction";
     const payloadHash = canonicalPayloadHash(input);
-    const legacyHash = legacyPayloadHash(input);
     const idempotencyKey = invocation.idempotencyKey.trim();
     return commandGuardService.execute(ctx, {
       operation,
@@ -130,14 +122,7 @@ export class FinancialTransactionService {
       confirmationTokenHash: invocation.confirmationTokenHash,
       previewPayloadHash: invocation.previewPayloadHash,
       resource: { type: "financial_transaction" },
-    }, async (session) => {
-      const existing = await McpMutationModel.findOne({ workspaceId: ctx.workspaceId, operation, idempotencyKey }).session(session).lean();
-      if (existing) {
-        if (!payloadHashMatches(existing.payloadHash, payloadHash, legacyHash)) throw new ApiError(409, "IDEMPOTENCY_PAYLOAD_MISMATCH", "Idempotency key đã dùng cho payload khác.");
-        return existing.result as Record<string, unknown>;
-      }
-      return this.createInternal(ctx, input, session);
-    });
+    }, (session) => this.createInternal(ctx, input, session));
   }
 
   static async update(ctx: ServiceContext, transactionId: string, input: UpdateFinancialTransactionInput, invocation: CommandInvocation) {
@@ -145,7 +130,6 @@ export class FinancialTransactionService {
     const operation = "update_financial_transaction";
     const payload = { transactionId, input };
     const payloadHash = canonicalPayloadHash(payload);
-    const legacyHash = legacyPayloadHash(payload);
     const idempotencyKey = invocation.idempotencyKey.trim();
     return commandGuardService.execute(ctx, {
       operation,
@@ -156,14 +140,7 @@ export class FinancialTransactionService {
       confirmationTokenHash: invocation.confirmationTokenHash,
       previewPayloadHash: invocation.previewPayloadHash,
       resource: { type: "financial_transaction", id: transactionId },
-    }, async (session) => {
-      const existingMutation = await McpMutationModel.findOne({ workspaceId: ctx.workspaceId, operation, idempotencyKey }).session(session).lean();
-      if (existingMutation) {
-        if (!payloadHashMatches(existingMutation.payloadHash, payloadHash, legacyHash)) throw new ApiError(409, "IDEMPOTENCY_PAYLOAD_MISMATCH", "Idempotency key đã dùng cho payload khác.");
-        return existingMutation.result as FinancialTransactionDto;
-      }
-      return this.updateInternal(ctx, transactionId, input, session);
-    });
+    }, (session) => this.updateInternal(ctx, transactionId, input, session));
   }
 
   static async delete(ctx: ServiceContext, transactionId: string, invocation: CommandInvocation) {
@@ -171,7 +148,6 @@ export class FinancialTransactionService {
     const operation = "delete_financial_transaction";
     const payload = { transactionId };
     const payloadHash = canonicalPayloadHash(payload);
-    const legacyHash = legacyPayloadHash(payload);
     const idempotencyKey = invocation.idempotencyKey.trim();
     return commandGuardService.execute(ctx, {
       operation,
@@ -182,14 +158,7 @@ export class FinancialTransactionService {
       confirmationTokenHash: invocation.confirmationTokenHash,
       previewPayloadHash: invocation.previewPayloadHash,
       resource: { type: "financial_transaction", id: transactionId },
-    }, async (session) => {
-      const existingMutation = await McpMutationModel.findOne({ workspaceId: ctx.workspaceId, operation, idempotencyKey }).session(session).lean();
-      if (existingMutation) {
-        if (!payloadHashMatches(existingMutation.payloadHash, payloadHash, legacyHash)) throw new ApiError(409, "IDEMPOTENCY_PAYLOAD_MISMATCH", "Idempotency key đã dùng cho payload khác.");
-        return existingMutation.result as { id: string };
-      }
-      return this.deleteInternal(ctx, transactionId, session);
-    });
+    }, (session) => this.deleteInternal(ctx, transactionId, session));
   }
 
   private static async createInternal(ctx: ServiceContext, input: CreateFinancialTransactionInput, session?: mongoose.ClientSession) {

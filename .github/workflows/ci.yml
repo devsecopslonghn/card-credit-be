@@ -18,6 +18,13 @@ jobs:
         run: |
           npm --prefix shared run validate
           npm --prefix backend run validate
+      - name: Checkout frontend contract mirror
+        uses: actions/checkout@v4
+        with:
+          repository: devsecopslonghn/card-credit-fe
+          path: frontend-contract-mirror
+      - name: Check frontend/backend contract and catalog drift
+        run: node backend/scripts/check-contract-drift.mjs frontend-contract-mirror
   image:
     needs: quality
     if: github.event_name != 'pull_request'

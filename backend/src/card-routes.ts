@@ -3,6 +3,7 @@ import { ApiError } from "./errors.js";
 import { browserServiceContext } from "./context.js";
 import type { AuthRepository } from "./auth-repository.js";
 import { CardQueryService } from "./services/card-query-service.js";
+import { CardReadFacade } from "./services/card-read-facade.js";
 import { CardCommandService } from "./services/card-command-service.js";
 import { CardLifecycleService } from "./services/card-lifecycle-service.js";
 import { MongoCatalogRepository } from "./mongo-catalog-repository.js";
@@ -43,7 +44,7 @@ export const legacyCardResponse = (card: Awaited<ReturnType<typeof CardQueryServ
 });
 
 export const registerCardRoutes = (app: FastifyInstance, secret: string, users?: AuthRepository, catalog: CatalogRepository = new MongoCatalogRepository()) => {
-  app.get<{ Querystring: { limit?: string } }>("/api/cards", async (request) => (await CardQueryService.list(await browserServiceContext(request, secret, users), {}, request.query.limit)).map(legacyCardResponse));
+  app.get<{ Querystring: { limit?: string } }>("/api/cards", async (request) => (await CardReadFacade.listCards(await browserServiceContext(request, secret, users), request.query.limit)).map(legacyCardResponse));
   app.post<{ Body: Data }>("/api/cards", async (request, reply) => { const card = await CardCommandService.create(await browserServiceContext(request, secret, users), request.body ?? {}, catalog); const response = legacyCardResponse(card); const result = reply.code(201); if (card.legacy) result.header("X-Deprecated-Contract", "legacy-card-create"); return result.send(response); });
   app.get<{ Querystring: { limit?: string } }>("/api/cards/duplicates", async (request) => {
     const groups = await CardQueryService.listDuplicates(await browserServiceContext(request, secret, users), request.query.limit);

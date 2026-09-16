@@ -20,7 +20,8 @@
     "reconcile:legacy-payments": "tsx scripts/reconcile-legacy-statement-payments.ts",
     "mark:legacy-payment-paid": "tsx scripts/mark-legacy-statement-payment-paid.ts",
     "ensure:command-guard-indexes": "tsx scripts/ensure-command-guard-indexes.ts",
-    "ensure:data-integrity-indexes": "tsx scripts/ensure-data-integrity-indexes.ts"
+    "ensure:data-integrity-indexes": "tsx scripts/ensure-data-integrity-indexes.ts",
+    "migrate:canonical-cards": "tsx scripts/migrate-canonical-cards.ts"
   },
   "dependencies": {
     "@card-credit/contracts": "file:../shared",

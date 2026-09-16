@@ -7,12 +7,13 @@ const MonthDataSchema = new Schema({
 }, { _id: false });
 
 const CreditCardSchema = new Schema({
-  userId: { type: String, default: null }, workspaceId: { type: String, default: null, index: true },
+  userId: { type: String, default: null }, workspaceId: { type: String, required: true, index: true },
   presetId: { type: String, default: null, index: true }, providerCode: { type: String, default: null },
   providerName: { type: String, default: null }, displayName: { type: String, default: null },
   network: { type: String, default: null }, catalogVersion: { type: String, default: null },
-  legacy: { type: Boolean, default: true }, bank: { type: String, required: true },
-  name: { type: String, required: true }, type: { type: String, required: true }, owner: { type: String, default: "Tôi" },
+  legacy: { type: Boolean, default: false },
+  // Read-compatible fields retained for historical legacy documents only.
+  bank: { type: String, default: null }, name: { type: String, default: null }, type: { type: String, default: null }, owner: { type: String, default: "Tôi" },
   imageUrl: { type: String, required: true }, annualFee: { type: Number, default: null },
   targetSpendForWaiver: { type: Number, default: 0 }, annualFeeWaiverTarget: { type: Number, default: null },
   statementDay: { type: Number, default: 1, min: 1, max: 31 }, paymentDueDays: { type: Number, default: 15, min: 1 },

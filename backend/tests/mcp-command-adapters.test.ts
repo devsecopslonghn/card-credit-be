@@ -24,10 +24,10 @@ const call = async (name: string, args: Record<string, unknown>, previewService?
   const server = createMcpServer(context, codec, previewService, "write");
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   const result = await client.callTool({ name, arguments: args });
-  const content = result.content as Array<{ type?: string; text?: string }>;
   await client.close();
   await server.close();
-  return JSON.parse(content[0]?.text ?? "null") as unknown;
+  if (!result.structuredContent || typeof result.structuredContent !== "object" || !("data" in result.structuredContent)) throw new Error("MCP command did not contain structuredContent envelope");
+  return (result.structuredContent as { data: unknown }).data;
 };
 
 test("MCP account confirm forwards the fixed command invocation", async (t) => {

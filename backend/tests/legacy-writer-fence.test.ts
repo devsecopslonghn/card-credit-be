@@ -7,10 +7,9 @@ const serviceSources = await Promise.all([
   readFile(new URL("../src/services/financial-transaction-service.ts", import.meta.url), "utf8"),
 ]);
 
-test("legacy McpMutationModel remains read-only in application services", () => {
-  const legacyWriterCall = /McpMutationModel\.(create|insert|update|updateOne|findOneAndUpdate|replaceOne|deleteOne|deleteMany|bulkWrite)\s*\(/;
+test("legacy McpMutationModel is not used by application command services", () => {
+  const legacyCall = /McpMutationModel\./;
   for (const source of serviceSources) {
-    assert.doesNotMatch(source, legacyWriterCall);
-    assert.match(source, /McpMutationModel\.findOne\s*\(/);
+    assert.doesNotMatch(source, legacyCall);
   }
 });

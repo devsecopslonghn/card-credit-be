@@ -7,7 +7,6 @@ import { FinancialTransactionModel } from "../src/models/financial-transaction.j
 import { AccountService } from "../src/services/account-service.js";
 import { McpMutationModel } from "../src/models/mcp-mutation.js";
 import { commandGuardService, type CommandGuardSpec } from "../src/services/command-guard-service.js";
-import { legacyPayloadHash } from "../src/command-hash.js";
 import type { ServiceContext } from "../src/services/types/service-context.js";
 
 const context: ServiceContext = { workspaceId: "workspace-a", userId: "user-a", role: "user", channel: "browser", correlationId: "transaction-command-test" };
@@ -76,9 +75,10 @@ test("financial transaction command computes its hash and delegates to the persi
   assert.match(observed?.payloadHash ?? "", /^[a-f0-9]{64}$/);
 });
 
-test("financial transaction command replays a legacy receipt inside the guard callback", async (t) => {
-  t.mock.method(McpMutationModel, "findOne", () => query({ payloadHash: legacyPayloadHash(input), result: { id: "legacy-transaction" } }) as never);
+test("financial transaction command does not consult the legacy receipt store", async (t) => {
   t.mock.method(commandGuardService, "execute", async (_ctx: ServiceContext, _spec: CommandGuardSpec, work: (session: mongoose.ClientSession) => Promise<unknown>) => work({} as mongoose.ClientSession));
-  const result = await FinancialTransactionService.create(context, input, { idempotencyKey: "legacy-transaction-1", endpointOrTool: "confirm_import_financial_transaction" });
-  assert.deepEqual(result, { id: "legacy-transaction" });
+  await assert.rejects(
+    () => FinancialTransactionService.create(context, input, { idempotencyKey: "legacy-transaction-1", endpointOrTool: "confirm_import_financial_transaction" }),
+    (error: unknown) => (error as { code?: string }).code === "INVALID_ACCOUNT_ID",
+  );
 });

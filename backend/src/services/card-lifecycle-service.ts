@@ -23,20 +23,6 @@ const card = async (ctx: ServiceContext, id: string, includeInactive = false) =>
   return result;
 };
 
-const legacyData = (value: unknown): Data[] => Array.isArray(value) ? value.filter((item): item is Data => Boolean(item) && typeof item === "object") : [];
-
-const mergeLegacyMonths = (target: unknown, source: unknown) => {
-  const result = new Map<number, Data>();
-  for (const item of [...legacyData(target), ...legacyData(source)]) {
-    const month = Number(item.month);
-    if (!Number.isInteger(month) || month < 1 || month > 12) continue;
-    const current = result.get(month) ?? { month, spend: 0, cashback: 0, fee: 0, otherInterest: 0 };
-    for (const field of ["spend", "cashback", "fee", "otherInterest"]) current[field] = Number(current[field] ?? 0) + Number(item[field] ?? 0);
-    result.set(month, current);
-  }
-  return [...result.values()].sort((a, b) => Number(a.month) - Number(b.month));
-};
-
 const dependentCounts = async (ctx: ServiceContext, cardId: string) => {
   const [accounts, statements, cashbacks, fees] = await Promise.all([
     AccountModel.countDocuments({ workspaceId: ctx.workspaceId, creditCardId: cardId }),
@@ -80,7 +66,7 @@ export class CardLifecycleService {
       await session.withTransaction(async () => {
         updated = await CreditCardModel.findOneAndUpdate(
           { _id: targetId, workspaceId: ctx.workspaceId, active: { $ne: false } },
-          { $set: { monthlyData: mergeLegacyMonths(target.monthlyData, source.monthlyData) } },
+          { $set: { updatedAt: new Date() } },
           { returnDocument: "after", session },
         ).lean() as Data | null;
         if (!updated) throw new ApiError(404, "CARD_NOT_FOUND", "Không tìm thấy thẻ đích.");

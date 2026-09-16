@@ -9,14 +9,15 @@ import { boundedReadLimit, READ_MAX_LIMIT } from "../read-limits.js";
 import { effectivePaymentStatus, idOf, plain, type Data } from "../statement-domain.js";
 import type { ServiceContext } from "./types/service-context.js";
 
-type StatementReadOptions = { cardId?: string; cardIds?: string[]; unpaidOnly?: boolean; paymentDueDates?: string[]; statementDateFrom?: string; statementDateTo?: string; limit?: number; cursor?: string; order?: "statementDate" | "paymentDueDate" };
+type StatementStatus = "OPEN" | "STATEMENT_CLOSED" | "PAID" | "OVERDUE";
+type StatementReadOptions = { cardId?: string; cardIds?: string[]; unpaidOnly?: boolean; paymentStatus?: StatementStatus; paymentDueDates?: string[]; statementDateFrom?: string; statementDateTo?: string; limit?: number; cursor?: string; order?: "statementDate" | "paymentDueDate" };
 export type StatementReadRepository = {
   listStatements(workspaceId: string, options: StatementReadOptions): Promise<Data[]>;
   findStatementById(workspaceId: string, statementId: string): Promise<Data | null>;
   findStatement(workspaceId: string, cardId: string, statementId: string): Promise<Data | null>;
   findCard(workspaceId: string, cardId: string): Promise<Data | null>;
   listCards(workspaceId: string, cardIds: string[]): Promise<Data[]>;
-  listTransactions(workspaceId: string, statementIds: string[]): Promise<Data[]>;
+  listTransactions(workspaceId: string, statementIds: string[], options?: { summaryOnly?: boolean }): Promise<Data[]>;
 };
 
 const execute = async <T>(query: unknown): Promise<T> => {
@@ -50,6 +51,7 @@ const mongoRepository: StatementReadRepository = {
     if (options.cardId) query.userCardId = options.cardId;
     else if (options.cardIds?.length) query.userCardId = { $in: options.cardIds };
     if (options.unpaidOnly) query.paymentStatus = { $ne: "PAID" };
+    if (options.paymentStatus) query.paymentStatus = options.paymentStatus;
     if (options.paymentDueDates?.length) query.paymentDueDate = { $in: options.paymentDueDates };
     if (options.statementDateFrom || options.statementDateTo) query.statementDate = { ...(options.statementDateFrom ? { $gte: options.statementDateFrom } : {}), ...(options.statementDateTo ? { $lte: options.statementDateTo } : {}) };
     const field = options.order === "paymentDueDate" ? "paymentDueDate" : "statementDate";
@@ -76,9 +78,13 @@ const mongoRepository: StatementReadRepository = {
     if (!cardIds.length) return [];
     return execute<Data[]>(sorted(CreditCardModel.find({ _id: { $in: cardIds }, workspaceId }), { createdAt: -1 }));
   },
-  async listTransactions(workspaceId, statementIds) {
+  async listTransactions(workspaceId, statementIds, options) {
     if (!statementIds.length) return [];
-    return execute<Data[]>(sorted(FinancialTransactionModel.find({ statementId: { $in: statementIds }, workspaceId }), { transactionDate: -1, createdAt: -1 }));
+    const query = FinancialTransactionModel.find({ statementId: { $in: statementIds }, workspaceId });
+    if (options?.summaryOnly && typeof (query as { select?: unknown }).select === "function") {
+      (query as { select: (fields: Record<string, 1>) => unknown }).select({ statementId: 1, transactionType: 1, creditDebt: 1, amount: 1, personalSpending: 1, outstandingReceivable: 1, reimbursementReceived: 1 });
+    }
+    return execute<Data[]>(sorted(query, { transactionDate: -1, createdAt: -1 }));
   },
 };
 
@@ -167,19 +173,20 @@ export const serializeStatementDto = (statement: Data, transactions: Data[] = []
 export class StatementQueryServiceImpl {
   constructor(private readonly repository: StatementReadRepository = mongoRepository) {}
 
-  async list(ctx: ServiceContext, options: { cardId?: string; unpaidOnly?: boolean; statementDateFrom?: string; statementDateTo?: string; limit?: number; order?: "statementDate" | "paymentDueDate"; includeTransactions?: boolean } = {}) {
+  async list(ctx: ServiceContext, options: { cardId?: string; unpaidOnly?: boolean; paymentStatus?: StatementStatus; statementDateFrom?: string; statementDateTo?: string; limit?: number; order?: "statementDate" | "paymentDueDate"; includeTransactions?: boolean } = {}) {
     if (options.cardId) await this.requireCard(ctx, options.cardId);
-    const loaded = await this.repository.listStatements(ctx.workspaceId, { cardId: options.cardId, unpaidOnly: options.unpaidOnly, statementDateFrom: options.statementDateFrom, statementDateTo: options.statementDateTo, limit: options.limit, order: options.order ?? "statementDate" });
+    const loaded = await this.repository.listStatements(ctx.workspaceId, { cardId: options.cardId, unpaidOnly: options.unpaidOnly, paymentStatus: options.paymentStatus, statementDateFrom: options.statementDateFrom, statementDateTo: options.statementDateTo, limit: options.limit, order: options.order ?? "statementDate" });
     const statements = options.cardId ? loaded : await this.onlyExistingCards(ctx, loaded);
     return this.build(statements, ctx.workspaceId, options.includeTransactions !== false);
   }
 
-  async listPage(ctx: ServiceContext, options: { cardId?: string; unpaidOnly?: boolean; statementDateFrom?: string; statementDateTo?: string; limit?: number; cursor?: string; order?: "statementDate" | "paymentDueDate"; includeTransactions?: boolean } = {}) {
+  async listPage(ctx: ServiceContext, options: { cardId?: string; unpaidOnly?: boolean; paymentStatus?: StatementStatus; statementDateFrom?: string; statementDateTo?: string; limit?: number; cursor?: string; order?: "statementDate" | "paymentDueDate"; includeTransactions?: boolean } = {}) {
     if (options.cardId) await this.requireCard(ctx, options.cardId);
     const limit = boundedReadLimit(options.limit);
     const loaded = await this.repository.listStatements(ctx.workspaceId, {
       cardId: options.cardId,
       unpaidOnly: options.unpaidOnly,
+      paymentStatus: options.paymentStatus,
       statementDateFrom: options.statementDateFrom,
       statementDateTo: options.statementDateTo,
       limit: limit + 1,
@@ -255,7 +262,7 @@ export class StatementQueryServiceImpl {
 
   private async build(statements: Data[], workspaceId: string, includeTransactions: boolean) {
     const statementIds = statements.map((statement) => idOf(statement._id));
-    const [transactions] = await Promise.all([this.repository.listTransactions(workspaceId, statementIds)]);
+    const [transactions] = await Promise.all([this.repository.listTransactions(workspaceId, statementIds, { summaryOnly: !includeTransactions })]);
     const grouped = new Map<string, Data[]>();
     for (const transaction of transactions) {
       const id = idOf(transaction.statementId);

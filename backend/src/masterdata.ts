@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { BankModel, CardTypeModel } from "./models/masterdata.js";
 export type MasterRecord = Record<string, unknown> & { _id?: unknown };
 export const MASTERDATA_DEFAULT_LIMIT = 100;
 export const MASTERDATA_MAX_LIMIT = 100;
@@ -10,12 +11,12 @@ export interface MasterdataRepository {
   remove(kind: "banks" | "cardtypes", id: string): Promise<void>;
 }
 export class MongoMasterdataRepository implements MasterdataRepository {
-  private collection(kind: "banks" | "cardtypes") { return mongoose.connection.collection(kind); }
-  async list(kind: "banks" | "cardtypes", sortField: string, limit = MASTERDATA_DEFAULT_LIMIT) { return this.collection(kind).find().sort({ [sortField]: 1 }).limit(limit).toArray(); }
-  async findInsensitive(kind: "banks" | "cardtypes", field: string, value: string) { return this.collection(kind).findOne({ [field]: { $regex: `^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } }); }
-  async create(kind: "banks" | "cardtypes", value: MasterRecord) { const { _id: _ignored, ...fields } = value; void _ignored; const now = new Date(); const result = await this.collection(kind).insertOne({ ...fields, createdAt: now, updatedAt: now }); return { ...fields, _id: result.insertedId, createdAt: now, updatedAt: now }; }
-  async update(kind: "banks" | "cardtypes", id: string, value: MasterRecord) { return this.collection(kind).findOneAndUpdate({ _id: new mongoose.Types.ObjectId(id) }, { $set: { ...value, updatedAt: new Date() } }, { returnDocument: "after" }); }
-  async remove(kind: "banks" | "cardtypes", id: string) { await this.collection(kind).deleteOne({ _id: new mongoose.Types.ObjectId(id) }); }
+  private model(kind: "banks" | "cardtypes") { return kind === "banks" ? BankModel : CardTypeModel; }
+  async list(kind: "banks" | "cardtypes", sortField: string, limit = MASTERDATA_DEFAULT_LIMIT) { return this.model(kind).find().sort({ [sortField]: 1 }).limit(limit).lean(); }
+  async findInsensitive(kind: "banks" | "cardtypes", field: string, value: string) { return this.model(kind).findOne({ [field]: { $regex: `^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } }).lean(); }
+  async create(kind: "banks" | "cardtypes", value: MasterRecord) { const { _id: _ignored, ...fields } = value; void _ignored; return this.model(kind).create({ ...fields, scope: "GLOBAL" }); }
+  async update(kind: "banks" | "cardtypes", id: string, value: MasterRecord) { return this.model(kind).findOneAndUpdate({ _id: new mongoose.Types.ObjectId(id) }, { $set: { ...value } }, { returnDocument: "after", runValidators: true }).lean(); }
+  async remove(kind: "banks" | "cardtypes", id: string) { await this.model(kind).deleteOne({ _id: new mongoose.Types.ObjectId(id) }); }
 }
 export class InMemoryMasterdataRepository implements MasterdataRepository {
   values: Record<"banks" | "cardtypes", MasterRecord[]> = { banks: [], cardtypes: [] };

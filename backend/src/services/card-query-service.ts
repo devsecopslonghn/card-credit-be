@@ -73,6 +73,25 @@ export class CardQueryService {
     return cardDtoFromDocument(card);
   }
 
+  static async search(ctx: ServiceContext, options: { query?: string; owner?: string; limit?: unknown } = {}): Promise<CardDto[]> {
+    const queryText = options.query?.trim();
+    const query: Record<string, unknown> = { workspaceId: ctx.workspaceId, active: { $ne: false } };
+    if (options.owner?.trim()) query.owner = options.owner.trim();
+    if (queryText) {
+      const escaped = queryText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const matcher = new RegExp(escaped, "i");
+      query.$or = [
+        { providerName: matcher },
+        { displayName: matcher },
+        { providerCode: matcher },
+        { bank: matcher },
+        { name: matcher },
+      ];
+    }
+    const cards = await CreditCardModel.find(query).sort({ createdAt: -1 }).limit(boundedReadLimit(options.limit)).lean();
+    return cards.map(cardDtoFromDocument);
+  }
+
  static async compare(ctx: ServiceContext, rawLimit?: unknown): Promise<CardDto[]> {
    return this.list(ctx, { activeOnly: true }, rawLimit);
  }

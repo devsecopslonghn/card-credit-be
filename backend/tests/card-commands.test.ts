@@ -1,5 +1,5 @@
-import assert from "node:assert/strict";
 import test from "node:test";
+import assert from "node:assert/strict";
 import type { CatalogProduct, CatalogRepository } from "../src/catalog.js";
 import { CardCommandService, type CardWriteRepository } from "../src/services/card-command-service.js";
 
@@ -41,12 +41,13 @@ test("card create command snapshots active catalog data and trusted tenancy", as
   assert.equal(cards.docs[0]?.annualFeeWaiverTarget, 1_000);
 });
 
-test("legacy create remains available behind the compatibility command", async () => {
+test("legacy create is rejected after the catalog-first cutover", async () => {
   const cards = new FakeCards();
-  const result = await CardCommandService.create(context, { bank: "OLD", name: "Old Card", type: "Visa", imageUrl: "/old.svg", annualFee: 0, owner: "Owner" }, catalog, cards);
-  assert.equal(result.legacy, true);
-  assert.equal(result.providerCode, "OLD");
-  assert.equal(cards.docs[0]?.workspaceId, "workspace-a");
+  await assert.rejects(
+    () => CardCommandService.create(context, { bank: "OLD", name: "Old Card", type: "Visa", imageUrl: "/old.svg", annualFee: 0, owner: "Owner" }, catalog, cards),
+    (error: unknown) => (error as { code?: string }).code === "CARD_CATALOG_REQUIRED",
+  );
+  assert.equal(cards.docs.length, 0);
 });
 
 test("card update command scopes workspace and ignores catalog snapshot fields", async () => {

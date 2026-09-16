@@ -46,6 +46,7 @@ test("MCP tools/list matches the canonical manifest", async () => {
   const result = await client.listTools();
   assert.deepEqual(result.tools.map(({ name }) => name), MCP_TOOL_INVENTORY);
   assert.equal(result.tools.length, mcpToolManifest.length);
+  assert.ok(result.tools.every(({ outputSchema }) => outputSchema && typeof outputSchema === "object"));
   await client.close();
   await server.close();
 });

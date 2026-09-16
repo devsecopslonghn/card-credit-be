@@ -7,6 +7,7 @@ import { FeeQueryService } from "../src/services/fee-query-service.js";
 import { MonthlyCashbackQueryService } from "../src/services/monthly-cashback-query-service.js";
 import { CardQueryService } from "../src/services/card-query-service.js";
 import { CashFlowQueryService } from "../src/services/cash-flow-query-service.js";
+import { StatementQueryService } from "../src/services/statement-query-service.js";
 import type { ServiceContext } from "../src/services/types/service-context.js";
 
 const context: ServiceContext = {
@@ -23,15 +24,11 @@ const call = async (name: string, args: Record<string, unknown>) => {
   const server = createMcpServer(context);
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   const result = await client.callTool({ name, arguments: args });
-  const content = result.content as Array<{ type?: string; text?: string }>;
   await client.close();
   await server.close();
-  const text = content[0]?.type === "text" ? content[0].text ?? "" : "";
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new Error(`Unexpected MCP text: ${text}`);
-  }
+  const envelope = result.structuredContent as { data?: unknown } | undefined;
+  if (!envelope || !("data" in envelope)) throw new Error("MCP result did not contain structuredContent envelope");
+  return envelope.data;
 };
 
 test("MCP fee and cashback read tools delegate trusted context and canonical DTOs", async (t) => {
@@ -107,6 +104,34 @@ test("MCP monthly cash-flow read tool delegates trusted context and canonical re
     data: [{ cardId: "507f1f77bcf86cd799439011", period: "2026-08", totalOut: 100, totalIn: 25, statementPayments: 100, actualFees: 10, partnerReturns: 25, bankCashbackActual: 5, netResult: -75, card: { id: "507f1f77bcf86cd799439011", providerName: "Bank", displayName: "Visa", owner: "Tôi" } }],
   });
   assert.equal(cashFlow.mock.callCount(), 1);
+});
+
+test("MCP card discovery and statement reads expose one structured envelope", async (t) => {
+  const cards = t.mock.method(CardQueryService, "search", async (ctx: ServiceContext, options: { query?: string; owner?: string; limit?: number }) => {
+    assert.equal(ctx.workspaceId, "workspace-a");
+    assert.deepEqual(options, { query: "UOB One", owner: undefined, limit: 10 });
+    return [{ id: "card-uob", displayName: "UOB Vietnam One" }] as never;
+  });
+  const statements = t.mock.method(StatementQueryService, "listPage", async (ctx: ServiceContext, options: Record<string, unknown>) => {
+    assert.equal(ctx.workspaceId, "workspace-a");
+    assert.equal(options.cardId, "card-uob");
+    assert.equal(options.unpaidOnly, true);
+    assert.equal(options.includeTransactions, false);
+    return { data: [{ id: "statement-uob", paymentStatus: "OPEN" }], limit: 10, nextCursor: null } as never;
+  });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "structured-read-test", version: "1.0.0" });
+  const server = createMcpServer(context);
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  const cardResult = await client.callTool({ name: "find_cards", arguments: { query: "UOB One", limit: 10 } });
+  const statementResult = await client.callTool({ name: "list_statements", arguments: { cardId: "card-uob", status: "UNPAID", limit: 10 } });
+  assert.deepEqual(cardResult.structuredContent && (cardResult.structuredContent as { data: unknown }).data, [{ id: "card-uob", displayName: "UOB Vietnam One" }]);
+  assert.deepEqual(statementResult.structuredContent && (statementResult.structuredContent as { data: unknown }).data, [{ id: "statement-uob", paymentStatus: "OPEN" }]);
+  assert.equal((statementResult.structuredContent as { meta: { nextCursor: string | null } }).meta.nextCursor, null);
+  assert.equal(cards.mock.callCount(), 1);
+  assert.equal(statements.mock.callCount(), 1);
+  await client.close();
+  await server.close();
 });
 
 test("MCP read tool schemas reject tenant fields and malformed year", async () => {

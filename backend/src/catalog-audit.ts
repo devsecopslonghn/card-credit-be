@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
 import type { FastifyRequest } from "fastify";
 import type { Session } from "./auth.js";
+import { AuthAuditLogModel } from "./models/auth.js";
 
 export type CatalogAuditEvent = {
   event: "CATALOG_PRODUCT_CREATED" | "CATALOG_PRODUCT_UPDATED" | "CATALOG_PROVIDER_BULK_UPDATED";
@@ -12,7 +12,7 @@ export type CatalogAuditEvent = {
 export type CatalogAuditWriter = (event: CatalogAuditEvent) => Promise<void>;
 
 export const writeCatalogAudit: CatalogAuditWriter = async ({ event, actor, request, resource }) => {
-  await mongoose.connection.collection("authauditlogs").insertOne({
+  await AuthAuditLogModel.create({
     event,
     userId: actor.userId,
     email: actor.email,
@@ -28,7 +28,7 @@ export const writeCatalogAudit: CatalogAuditWriter = async ({ event, actor, requ
 };
 
 export const writeAuthAudit = async (event: string, request: FastifyRequest, actor?: Session | null, email?: string | null, resource?: Record<string, unknown>) => {
-  await mongoose.connection.collection("authauditlogs").insertOne({
+  await AuthAuditLogModel.create({
     event, userId: actor?.userId ?? null, email: actor?.email ?? email ?? null,
     role: actor?.role ?? null, workspaceId: actor?.workspaceId ?? null,
     ip: request.ip || null, userAgent: request.headers["user-agent"] || null,

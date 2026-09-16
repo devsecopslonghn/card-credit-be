@@ -22,12 +22,11 @@ const callMcp = async (args: Record<string, unknown>) => {
   const server = createMcpServer(mcpContext);
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   const result = await client.callTool({ name: "list_transactions", arguments: args });
-  const content = result.content as Array<{ type?: string; text?: string }>;
   await client.close();
   await server.close();
-  const text = content[0]?.text ?? "null";
-  let value: unknown = text;
-  try { value = JSON.parse(text); } catch { /* MCP errors are plain text. */ }
+  const value = result.structuredContent && typeof result.structuredContent === "object" && "data" in result.structuredContent
+    ? (result.structuredContent as { data: unknown }).data
+    : (result.content as Array<{ type?: string; text?: string }>)[0]?.text ?? "null";
   return { result, value };
 };
 

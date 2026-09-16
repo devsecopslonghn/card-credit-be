@@ -24,7 +24,7 @@ test("card routes require authentication and validate requests before database a
   assert.equal(invalidId.json().error.code, "INVALID_CARD_ID");
   const invalidCreate = await app.inject({ method: "POST", url: "/api/cards", headers: { cookie }, payload: {} });
   assert.equal(invalidCreate.statusCode, 400);
-  assert.equal(invalidCreate.json().error.code, "INVALID_REQUEST");
+  assert.equal(invalidCreate.json().error.code, "CARD_CATALOG_REQUIRED");
   await app.close();
 });
 

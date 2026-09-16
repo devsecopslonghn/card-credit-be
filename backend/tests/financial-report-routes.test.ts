@@ -22,10 +22,10 @@ const callMcpSummary = async (args: Record<string, unknown>) => {
   const server = createMcpServer(mcpContext);
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   const result = await client.callTool({ name: "get_personal_finance_summary", arguments: args });
-  const content = result.content as Array<{ type?: string; text?: string }>;
   await client.close();
   await server.close();
-  return JSON.parse(content[0]?.text ?? "null") as unknown;
+  if (!result.structuredContent || typeof result.structuredContent !== "object" || !("data" in result.structuredContent)) throw new Error("MCP report did not contain structuredContent envelope");
+  return (result.structuredContent as { data: unknown }).data;
 };
 
 test("REST report summary resolves current-month defaults through the shared range", async (t) => {

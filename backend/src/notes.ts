@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import { CalendarNoteModel } from "./models/calendar-note.js";
 
 export type Note = { id?: string; workspaceId: string; date: string; content: string };
 export const NOTES_DEFAULT_LIMIT = 100;
@@ -13,10 +13,9 @@ const serialize = (value: Record<string, unknown>): Note => ({
   workspaceId: String(value.workspaceId), date: String(value.date), content: String(value.content ?? ""),
 });
 export class MongoNotesRepository implements NotesRepository {
-  private collection() { return mongoose.connection.collection("calendarnotes"); }
-  async list(workspaceId: string, limit = NOTES_DEFAULT_LIMIT) { return (await this.collection().find({ workspaceId }).sort({ date: -1 }).limit(limit).toArray()).map(serialize); }
-  async upsert(workspaceId: string, date: string, content: string) { const result = await this.collection().findOneAndUpdate({ workspaceId, date }, { $set: { workspaceId, date, content, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } }, { upsert: true, returnDocument: "after" }); return serialize(result!); }
-  async remove(workspaceId: string, date: string) { await this.collection().deleteOne({ workspaceId, date }); }
+  async list(workspaceId: string, limit = NOTES_DEFAULT_LIMIT) { return (await CalendarNoteModel.find({ workspaceId }).sort({ date: -1 }).limit(limit).lean()).map(serialize); }
+  async upsert(workspaceId: string, date: string, content: string) { const result = await CalendarNoteModel.findOneAndUpdate({ workspaceId, date }, { $set: { workspaceId, date, content } }, { upsert: true, returnDocument: "after", runValidators: true }).lean(); return serialize(result!); }
+  async remove(workspaceId: string, date: string) { await CalendarNoteModel.deleteOne({ workspaceId, date }); }
 }
 export class InMemoryNotesRepository implements NotesRepository {
   notes: Note[] = [];

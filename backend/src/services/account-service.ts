@@ -5,10 +5,9 @@ import { ApiError } from "../errors.js";
 import { idOf, plain } from "../statement-domain.js";
 import { accountGroup, type AccountType } from "../financial-domain.js";
 import type { ServiceContext } from "./types/service-context.js";
-import { McpMutationModel } from "../models/mcp-mutation.js";
 import type { AccountDto, CreateAccountInput } from "@card-credit/contracts";
 import mongoose from "mongoose";
-import { canonicalPayloadHash, legacyPayloadHash, payloadHashMatches } from "../command-hash.js";
+import { canonicalPayloadHash } from "../command-hash.js";
 import { commandGuardService, type CommandInvocation } from "./command-guard-service.js";
 import { StatementQueryService } from "./statement-query-service.js";
 
@@ -128,7 +127,6 @@ export class AccountService {
     if (input.type !== "CREDIT" && input.creditCardId) throw new ApiError(400, "INVALID_ACCOUNT", "Chỉ tài khoản CREDIT mới được liên kết thẻ.");
     const operation = "create_account";
     const payloadHash = canonicalPayloadHash(input);
-    const legacyHash = legacyPayloadHash(input);
     const idempotencyKey = invocation.idempotencyKey.trim();
     return commandGuardService.execute(ctx, {
       operation,
@@ -139,14 +137,7 @@ export class AccountService {
       confirmationTokenHash: invocation.confirmationTokenHash,
       previewPayloadHash: invocation.previewPayloadHash,
       resource: { type: "account" },
-    }, async (session) => {
-      const existingMutation = await McpMutationModel.findOne({ workspaceId: ctx.workspaceId, operation, idempotencyKey }).session(session).lean();
-      if (existingMutation) {
-        if (!payloadHashMatches(existingMutation.payloadHash, payloadHash, legacyHash)) throw new ApiError(409, "IDEMPOTENCY_PAYLOAD_MISMATCH", "Idempotency key đã dùng cho payload khác.");
-        return existingMutation.result as AccountDto;
-      }
-      return this.createInternal(ctx, input, session);
-    });
+    }, (session) => this.createInternal(ctx, input, session));
   }
 
   static async previewMerge(ctx: ServiceContext, input: { sourceAccountIds: string[]; targetAccountId?: string; targetName?: string; targetType?: AccountType; keepTargetAsCash?: boolean; expectedVersion?: number }) {

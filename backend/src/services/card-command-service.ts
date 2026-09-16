@@ -20,7 +20,6 @@ const cardRepository: CardWriteRepository = {
   findOneAndUpdate: (filter, update) => CreditCardModel.findOneAndUpdate(filter, update, { returnDocument: "after" }).lean().exec(),
 };
 
-const months = () => Array.from({ length: 12 }, (_, index) => ({ month: index + 1, spend: 0, cashback: 0, fee: 0, otherInterest: 0 }));
 const owner = (value: unknown) => {
   if (typeof value !== "string" || !value.trim() || value.trim().length > 120) throw new ApiError(400, "INVALID_OWNER", "Tên chủ thẻ không hợp lệ.", { owner: "Tên chủ thẻ là bắt buộc và tối đa 120 ký tự." });
   return value.trim().replace(/\s+/g, " ");
@@ -49,32 +48,17 @@ const createFromCatalog = (ctx: ServiceContext, body: Data, product: CatalogProd
   network: product.network,
   catalogVersion: "mongodb-v1",
   legacy: false,
-  bank: product.providerCode,
-  name: product.displayName,
-  type: product.network,
   owner: owner(body.owner),
   imageUrl: product.imageUrl ?? "/card-images/placeholder-card.svg",
   annualFee: product.annualFee,
   targetSpendForWaiver: product.targetSpendForWaiver ?? 0,
   annualFeeWaiverTarget: product.targetSpendForWaiver ?? null,
-  monthlyData: months(),
 });
 
 const createLegacy = (ctx: ServiceContext, body: Data) => {
-  if (typeof body.bank !== "string" || typeof body.name !== "string" || typeof body.type !== "string" || typeof body.imageUrl !== "string") throw new ApiError(400, "INVALID_REQUEST", "Request body không hợp lệ.", { presetId: "presetId là bắt buộc cho catalog-first contract." });
-  return {
-    userId: ctx.userId,
-    workspaceId: ctx.workspaceId,
-    bank: body.bank,
-    name: body.name,
-    type: body.type,
-    owner: owner(body.owner),
-    imageUrl: body.imageUrl,
-    annualFee: optionalNumber(body.annualFee, "annualFee"),
-    targetSpendForWaiver: typeof body.targetSpendForWaiver === "number" ? body.targetSpendForWaiver : 0,
-    legacy: true,
-    monthlyData: Array.isArray(body.monthlyData) ? body.monthlyData : months(),
-  };
+  void ctx;
+  void body;
+  throw new ApiError(400, "CARD_CATALOG_REQUIRED", "Tạo thẻ mới phải chọn presetId từ Card Catalog; contract legacy đã bị khóa.");
 };
 
 const updatePayload = (body: Data): Data => {

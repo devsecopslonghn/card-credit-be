@@ -12,6 +12,17 @@ export type McpToolDefinition = {
   inputSchema: ZodRawShape;
 };
 
+export const mcpOutputSchema = {
+  data: z.unknown(),
+  meta: z.object({
+    count: z.number().int().nonnegative().optional(),
+    limit: z.number().int().positive().optional(),
+    nextCursor: z.string().nullable().optional(),
+    asOf: z.string().datetime().optional(),
+    warnings: z.array(z.string()).optional(),
+  }).passthrough(),
+};
+
 export const MCP_OPERATION = {
   importFinancialTransactionBatch: "import_financial_transaction_batch",
   createAccount: "create_account",
@@ -25,11 +36,13 @@ const definitions = [
   { name: "list_transactions", description: "List up to 100 workspace-scoped financial transactions from Financial Domain using an inclusive from/to date range, optional account/category filters and a bounded limit.", kind: "query", inputSchema: { ...financialTransactionListQuerySchema.shape, date: z.never().optional() } },
   { name: "get_monthly_cash_flow", description: "Read canonical Financial Domain cash-flow totals by month and card in the fixed workspace.", kind: "query", inputSchema: { period: z.string().regex(/^[1-9]\d{3}-(0[1-9]|1[0-2])$/).optional(), cardId: z.string().min(1).optional() } },
   { name: "compare_cards", description: "Compare up to 100 active cards in the fixed workspace.", kind: "query", inputSchema: { limit: z.number().int().min(1).max(100).optional() } },
+  { name: "find_cards", description: "Find active cards by card name, bank/provider or owner in the fixed workspace. Use this before card-specific statement queries when only a human-readable card name is known.", kind: "query", inputSchema: { query: z.string().trim().min(1).optional(), owner: z.string().trim().min(1).optional(), limit: z.number().int().min(1).max(100).optional() } },
+  { name: "list_statements", description: "List workspace-scoped card statements with optional card, payment status, statement-date range and cursor pagination. Results are ordered by statement date unless paymentDueDate order is requested.", kind: "query", inputSchema: { cardId: z.string().min(1).optional(), status: z.enum(["ALL", "UNPAID", "OPEN", "STATEMENT_CLOSED", "PAID", "OVERDUE"]).default("ALL"), from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), order: z.enum(["statementDate", "paymentDueDate"]).default("statementDate"), limit: z.number().int().min(1).max(100).default(20), cursor: z.string().min(1).optional() } },
   { name: "list_duplicate_cards", description: "List exact duplicate groups from up to 100 active cards in the fixed workspace.", kind: "query", inputSchema: { limit: z.number().int().min(1).max(100).optional() } },
   { name: "list_card_fee_payments", description: "List up to 100 canonical fee payments for one card in the fixed workspace.", kind: "query", inputSchema: { cardId: z.string().min(1), limit: z.number().int().min(1).max(100).optional() } },
   { name: "list_fee_center", description: "List up to 100 canonical categorized fee records in the fixed workspace.", kind: "query", inputSchema: { cardId: z.string().min(1).optional(), category: feeCategorySchema.optional(), limit: z.number().int().min(1).max(100).optional() } },
   { name: "list_monthly_cashbacks", description: "List canonical monthly bank cashback records for one card and year.", kind: "query", inputSchema: { cardId: z.string().min(1), year: z.string().regex(/^\d{4}$/) } },
-  { name: "list_upcoming_statements", description: "List unpaid statements from Financial Domain ordered by payment due date.", kind: "query", inputSchema: { limit: z.number().int().min(1).max(50).default(20) } },
+  { name: "list_upcoming_statements", description: "List unpaid statements from Financial Domain ordered by payment due date with cursor pagination.", kind: "query", inputSchema: { limit: z.number().int().min(1).max(50).default(20), cursor: z.string().min(1).optional() } },
   { name: "get_personal_finance_summary", description: "Read canonical ledger totals, benefit reconciliation and creditDebtLedger rows for every statement (including paid debt), optionally scoped by card or owner and calendar year/month.", kind: "query", inputSchema: { ...reportQueryInputSchema.shape } },
   { name: "preview_import_financial_transaction", description: "Prepare transactions and return backend-calculated impacts. The caller must present previewImpact exactly; do not recalculate fees or receivables.", kind: "preview", operation: MCP_OPERATION.importFinancialTransactionBatch, inputSchema: createFinancialTransactionBatchInputSchema.shape },
   { name: "confirm_import_financial_transaction", description: "Confirm the whole financial transaction batch once after human review.", kind: "confirm", operation: MCP_OPERATION.importFinancialTransactionBatch, inputSchema: { payload: createFinancialTransactionBatchInputSchema, confirmationToken: z.string().min(1), idempotencyKey: z.string().min(8) } },
@@ -57,5 +70,5 @@ export const mcpToolNamesForMode = (mode: McpWriterMode = "read") =>
 export const mcpToolMetadata = (name: McpToolName) => {
   const definition = mcpToolManifest.find((item) => item.name === name);
   if (!definition) throw new Error(`MCP tool ${name} is missing from manifest`);
-  return { description: definition.description, inputSchema: definition.inputSchema };
+  return { description: definition.description, inputSchema: definition.inputSchema, outputSchema: mcpOutputSchema };
 };

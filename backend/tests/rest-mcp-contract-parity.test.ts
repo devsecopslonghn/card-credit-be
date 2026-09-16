@@ -41,10 +41,10 @@ const callMcp = async (name: string, args: Record<string, unknown>) => {
   const server = createMcpServer(mcpContext);
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   const result = await client.callTool({ name, arguments: args });
-  const content = result.content as Array<{ type?: string; text?: string }>;
   await client.close();
   await server.close();
-  return JSON.parse(content[0]?.text ?? "null") as unknown;
+  if (!result.structuredContent || typeof result.structuredContent !== "object" || !("data" in result.structuredContent)) throw new Error("MCP result did not contain structuredContent envelope");
+  return (result.structuredContent as { data: unknown }).data;
 };
 
 const card = (id: string) => ({
@@ -144,8 +144,8 @@ test("REST and MCP statement payment previews parse to the same canonical DTO", 
   const server = createMcpServer(mcpContext, codec, previewService, "write");
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   const mcpResult = await client.callTool({ name: "preview_pay_statement", arguments: { cardId, statementId, input: { action: "PAID", repaymentAccountId: fixture.repaymentAccountId } } });
-  const mcpContent = mcpResult.content as Array<{ type?: string; text?: string }>;
-  const mcp = JSON.parse(mcpContent[0]?.text ?? "null");
+  if (!mcpResult.structuredContent || typeof mcpResult.structuredContent !== "object" || !("data" in mcpResult.structuredContent)) throw new Error("MCP preview did not contain structuredContent envelope");
+  const mcp = (mcpResult.structuredContent as { data: unknown }).data;
   assert.deepEqual(statementPaymentPreviewSchema.parse(rest.json().data), statementPaymentPreviewSchema.parse(mcp));
   assert.equal(preview.mock.callCount(), 2);
   await client.close();
