@@ -9,7 +9,7 @@ import type { ServiceContext } from "./types/service-context.js";
 import { ApiError } from "../errors.js";
 import { StatementQueryService } from "./statement-query-service.js";
 import { creditDebtLedgerListSchema, financialReportSchema, reportDateRangeSchema } from "@card-credit/contracts";
-import type { FinancialReportDto } from "@card-credit/contracts";
+import type { FinancialReportDto, StatementDto } from "@card-credit/contracts";
 
 type Range = { from: string; to: string };
 type Data = Record<string, unknown>;
@@ -63,6 +63,30 @@ const add = (target: ReturnType<typeof empty>, item: Record<string, unknown>) =>
   target.transactionCount += 1;
 };
 
+const buildCreditDebtLedger = (range: Range, statements: StatementDto[], cards: Data[]) => {
+  const cardById = new Map(cards.map((card) => [String(card._id), card]));
+  return creditDebtLedgerListSchema.parse(statements
+    .filter((statement) => statement.statementDate >= range.from && statement.statementDate <= range.to)
+    .flatMap((statement) => {
+      const card = cardById.get(statement.cardId);
+      if (!card) return [];
+      return [{
+        cardId: statement.cardId,
+        statementId: statement.id,
+        providerName: String(card.providerName ?? ""),
+        displayName: String(card.displayName ?? ""),
+        owner: String(card.owner ?? "Tôi"),
+        statementDate: statement.statementDate,
+        paymentDueDate: statement.paymentDueDate,
+        paymentStatus: statement.paymentStatus,
+        grossDebt: statement.summary.statementAmount,
+        paidDebt: statement.summary.paymentAmount,
+        outstandingDebt: statement.summary.outstandingAmount,
+        transactionCount: statement.summary.transactionCount,
+      }];
+    }));
+};
+
 export class FinancialReportService {
   static async statementSummary(ctx: ServiceContext, statementId: string) {
     return StatementQueryService.getById(ctx, statementId);
@@ -86,30 +110,12 @@ export class FinancialReportService {
       ...(filters.owner ? { owner: filters.owner.trim() } : {}),
     }).select({ _id: 1, providerName: 1, displayName: 1, owner: 1 }));
     if (filters.cardId && !cards.length) throw new ApiError(404, "CARD_NOT_FOUND", "Không tìm thấy thẻ.");
-    const cardById = new Map(cards.map((card) => [String(card._id), card]));
     const statements = await StatementQueryService.list(ctx, {
       statementDateFrom: range.from,
       statementDateTo: range.to,
       includeTransactions: false,
     });
-    return creditDebtLedgerListSchema.parse(statements.flatMap((statement) => {
-      const card = cardById.get(String(statement.cardId));
-      if (!card) return [];
-      return [{
-        cardId: statement.cardId,
-        statementId: statement.id,
-        providerName: String(card.providerName ?? ""),
-        displayName: String(card.displayName ?? ""),
-        owner: String(card.owner ?? "Tôi"),
-        statementDate: statement.statementDate,
-        paymentDueDate: statement.paymentDueDate,
-        paymentStatus: statement.paymentStatus,
-        grossDebt: statement.summary.statementAmount,
-        paidDebt: statement.summary.paymentAmount,
-        outstandingDebt: statement.summary.outstandingAmount,
-        transactionCount: statement.summary.transactionCount,
-      }];
-    }));
+    return buildCreditDebtLedger(range, statements, cards);
   }
 
   static async summary(ctx: ServiceContext, range: Range, filters: { cardId?: string; owner?: string } = {}) {
@@ -119,15 +125,16 @@ export class FinancialReportService {
     const cardScope: Record<string, unknown> = { workspaceId: ctx.workspaceId };
     let cardAccountIds: unknown[] = [];
     let reportCardIds: unknown[] | null = null;
+    let reportCards: Data[] | null = null;
     if (filters.cardId || filters.owner) {
       if (filters.cardId && !mongoose.isValidObjectId(filters.cardId)) throw new ApiError(400, "INVALID_REPORT_FILTER", "Bộ lọc thẻ không hợp lệ.");
-      const cards = await readReportCollection<Data>(CreditCardModel.find({
+      reportCards = await readReportCollection<Data>(CreditCardModel.find({
         ...cardScope,
         ...(filters.cardId ? { _id: filters.cardId } : {}),
         ...(filters.owner ? { owner: filters.owner.trim() } : {}),
-      }).select({ _id: 1 }));
-      if (filters.cardId && !cards.length) throw new ApiError(404, "CARD_NOT_FOUND", "Không tìm thấy thẻ.");
-      reportCardIds = cards.map((card) => card._id);
+      }).select({ _id: 1, providerName: 1, displayName: 1, owner: 1 }));
+      if (filters.cardId && !reportCards.length) throw new ApiError(404, "CARD_NOT_FOUND", "Không tìm thấy thẻ.");
+      reportCardIds = reportCards.map((card) => card._id);
       const [cardAccounts, cardStatements] = await Promise.all([
         readReportCollection<Data>(AccountModel.find({ ...accountScope, creditCardId: { $in: reportCardIds } }).select({ _id: 1 })),
         readReportCollection<Data>(CardStatementModel.find({ ...cardScope, userCardId: { $in: reportCardIds } }).select({ _id: 1 })),
@@ -138,7 +145,7 @@ export class FinancialReportService {
         { statementId: { $in: cardStatements.map((statement) => statement._id) } },
       ] };
     }
-    const [items, accounts, monthlyCashbacks, feePayments, allAccountTransactions, allStatements] = await Promise.all([
+    const [items, accounts, monthlyCashbacks, feePayments, allAccountTransactions, allStatements, ledgerCards] = await Promise.all([
       readReportCollection<Data>(FinancialTransactionModel.find(transactionScope)),
       readReportCollection<Data>(AccountModel.find(accountScope)),
       readReportCollection<Data>(MonthlyCardCashbackModel.find({ workspaceId: ctx.workspaceId, ...(reportCardIds ? { userCardId: { $in: reportCardIds } } : {}), period: { $gte: range.from.slice(0, 7), $lte: range.to.slice(0, 7) } })),
@@ -150,6 +157,7 @@ export class FinancialReportService {
       })),
       readReportCollection<Data>(FinancialTransactionModel.find({ workspaceId: ctx.workspaceId })),
       StatementQueryService.list(ctx, { includeTransactions: false }),
+      reportCards ? Promise.resolve(reportCards) : readReportCollection<Data>(CreditCardModel.find(cardScope).select({ _id: 1, providerName: 1, displayName: 1, owner: 1 })),
     ]);
     const reportAccounts = reportCardIds
       ? accounts.filter((account) => cardAccountIds.some((id) => String(id) === String(account._id)) || items.some((item) => String(item.accountId) === String(account._id)))
@@ -202,7 +210,7 @@ export class FinancialReportService {
     const sourceIds = items.filter((item) => item.transactionType === "EXPENSE" && item.ownership === "PAID_FOR_OTHER").map((item) => item._id);
     const reimbursements = sourceIds.length ? await readReportCollection<Data>(FinancialTransactionModel.find({ workspaceId: ctx.workspaceId, transactionType: "REIMBURSEMENT", reimbursementForTransactionId: { $in: sourceIds } }).select({ amount: 1 })) : [];
     totals.outstandingReceivable = Math.max(0, totals.outstandingReceivable - reimbursements.reduce((sum, item) => sum + Number(item.amount ?? 0), 0));
-    const creditDebtLedger = await this.creditDebtLedger(ctx, range, filters);
+    const creditDebtLedger = buildCreditDebtLedger(range, allStatements, ledgerCards);
     const allCashflowByAccount = new Map<string, number>();
     for (const item of allAccountTransactions) allCashflowByAccount.set(String(item.accountId), (allCashflowByAccount.get(String(item.accountId)) ?? 0) + Number(item.debitCashflow ?? 0));
     const activeRealMoney = accounts.filter((account) => ["DEBIT", "CASH", "E_WALLET"].includes(String(account.type))).reduce((sum, account) => sum + Number(account.openingBalance ?? 0) + (allCashflowByAccount.get(String(account._id)) ?? 0), 0);
