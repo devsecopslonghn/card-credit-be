@@ -25,6 +25,7 @@ The read-only inspection of `mongodb-atlas-jrcf` / `test` found:
 - Four cards have no `workspaceId`, no `userId`, and no statements. They are not safe to assign to a workspace by inference; two are empty/incomplete catalog rows and two are legacy UOB One/VIB Max Card rows.
 - The current preflight found no orphan `accounts.creditCardId` references. The 8 accounts contain 5 valid credit-card links and 3 non-credit accounts; account cleanup is not part of this migration.
 - `mcpmutations` still contains 17 historical rows although runtime idempotency is now owned by `commandreceipts`, `commandpreviews` and `commandaudits`.
+- The four workspace-less cards were confirmed as test data and archived in `creditcardarchives`; their exact source documents were removed from `creditcards` only after the zero-reference preflight passed. The cleanup command is idempotent.
 - `cardproducts` contains 33 global catalog rows; `banks` and `cardtypes` are empty global master-data collections. The required card and financial indexes already exist.
 
 ## Safe execution order
@@ -32,8 +33,8 @@ The read-only inspection of `mongodb-atlas-jrcf` / `test` found:
 1. Completed: Bytebase project `projects/card-credit-db-hvjd` owns `instances/mongodb-atlas-jrcf/databases/test` in the develop environment; verify this assignment before each rollout.
 2. Take the MongoDB Atlas snapshot/export required by the operational policy. Record counts for `creditcards`, `accounts`, `cardstatements`, `financialtransactions`, `commandreceipts`, `commandpreviews`, `commandaudits` and `mcpmutations`.
 3. Run `npm run migrate:canonical-cards` without `--apply` from the exact backend commit being deployed. The command now reports `mode: blocked` for `--apply` when any card lacks a workspace, so it cannot partially rewrite the collection.
-4. Resolve the four workspace-less cards explicitly. Assign a workspace only when an authoritative owner/reference proves it; otherwise export and archive/remove them in a separately reviewed cleanup change.
-5. Re-run the dry-run. The required gate is `unresolved: []`, with every candidate having a workspace and exactly one catalog product.
+4. Completed: `archive:unowned-test-cards` archived the four exact reviewed IDs after confirming zero statements, cashbacks, fees and account references; no other card was touched.
+5. Completed preflight: the canonical-card dry-run now reports 10 cards and `unresolved: []`, with every remaining card having a workspace and exactly one catalog product.
 6. During a controlled maintenance window, run the same command with `--apply`. It writes the canonical catalog snapshot, normalizes `workspaceId`, and unsets `legacy`, `bank`, `name`, `type`, `monthlyData`, `statementDate`, `paymentDueDate`, `amountDueThisMonth` and `isPaidThisMonth` in one deterministic pass.
 7. Verify: all `creditcards` have the canonical required fields, no legacy keys remain, every card has a workspace, card references from statements/cashbacks/fees resolve, and all workspace-scoped queries return the expected counts.
 8. Run `npm run ensure:command-guard-indexes` and `npm run ensure:data-integrity-indexes`, then smoke-test REST and MCP with the same workspace. Keep `mcpmutations` read-only until its export/audit is complete; remove it in a separate approved cleanup plan because it is obsolete data, not a runtime compatibility path.
