@@ -29,6 +29,14 @@ test("statement summary uses persisted credit impact and excludes payment from c
   });
 });
 
+test("statement summary subtracts reimbursements linked outside the statement", () => {
+  const source = { _id: "507f1f77bcf86cd799439051", statementId, accountType: "CREDIT", transactionType: "EXPENSE", ownership: "PAID_FOR_OTHER", amount: 17_080_000, creditDebt: 17_080_000, personalSpending: 478_240, outstandingReceivable: 16_601_760, reimbursementExpected: 16_601_760, reimbursementReceived: 0 };
+  assert.deepEqual(summarizeStatementTransactions([source], [{ reimbursementForTransactionId: source._id, amount: 16_601_760, reimbursementReceived: 16_601_760 }]), {
+    statementAmount: 17_080_000, paymentAmount: 0, outstandingAmount: 17_080_000,
+    personalSpending: 478_240, outstandingReceivable: 0, reimbursementReceived: 16_601_760, transactionCount: 1,
+  });
+});
+
 test("statement query batches transactions and scopes parent card", async () => {
   const calls: string[] = [];
   const service = createStatementQueryService(repository(calls));

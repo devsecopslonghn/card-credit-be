@@ -18,6 +18,7 @@ export type StatementReadRepository = {
   findCard(workspaceId: string, cardId: string): Promise<Data | null>;
   listCards(workspaceId: string, cardIds: string[]): Promise<Data[]>;
   listTransactions(workspaceId: string, statementIds: string[], options?: { summaryOnly?: boolean }): Promise<Data[]>;
+  listReimbursements?(workspaceId: string, sourceTransactionIds: string[]): Promise<Data[]>;
 };
 
 const execute = async <T>(query: unknown): Promise<T> => {
@@ -82,15 +83,25 @@ const mongoRepository: StatementReadRepository = {
     if (!statementIds.length) return [];
     const query = FinancialTransactionModel.find({ statementId: { $in: statementIds }, workspaceId });
     if (options?.summaryOnly && typeof (query as { select?: unknown }).select === "function") {
-      (query as { select: (fields: Record<string, 1>) => unknown }).select({ statementId: 1, transactionType: 1, creditDebt: 1, amount: 1, personalSpending: 1, outstandingReceivable: 1, reimbursementReceived: 1 });
+      (query as { select: (fields: Record<string, 1>) => unknown }).select({ statementId: 1, transactionType: 1, ownership: 1, creditDebt: 1, amount: 1, personalSpending: 1, reimbursementExpected: 1, outstandingReceivable: 1, reimbursementReceived: 1 });
     }
     return execute<Data[]>(sorted(query, { transactionDate: -1, createdAt: -1 }));
+  },
+  async listReimbursements(workspaceId, sourceTransactionIds) {
+    if (!sourceTransactionIds.length) return [];
+    return execute<Data[]>(FinancialTransactionModel.find({ workspaceId, transactionType: "REIMBURSEMENT", reimbursementForTransactionId: { $in: sourceTransactionIds } }).select({ reimbursementForTransactionId: 1, amount: 1, reimbursementReceived: 1 }));
   },
 };
 
 const numberValue = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
-export const summarizeStatementTransactions = (transactions: Data[]) => {
+export const summarizeStatementTransactions = (transactions: Data[], linkedReimbursements: Data[] = []) => {
+  const collectedBySource = new Map<string, number>();
+  for (const reimbursement of linkedReimbursements) {
+    const sourceId = reimbursement.reimbursementForTransactionId ? idOf(reimbursement.reimbursementForTransactionId) : "";
+    if (!sourceId) continue;
+    collectedBySource.set(sourceId, (collectedBySource.get(sourceId) ?? 0) + Math.max(numberValue(reimbursement.reimbursementReceived) || numberValue(reimbursement.amount), 0));
+  }
   let statementAmount = 0;
   let paymentAmount = 0;
   let personalSpending = 0;
@@ -106,10 +117,16 @@ export const summarizeStatementTransactions = (transactions: Data[]) => {
     if (type !== "STATEMENT_PAYMENT") {
       transactionCount += 1;
       personalSpending += Math.max(numberValue(transaction.personalSpending), 0);
-      outstandingReceivable += Math.max(numberValue(transaction.outstandingReceivable), 0);
+      if (type === "EXPENSE" && transaction.ownership === "PAID_FOR_OTHER") {
+        const gross = numberValue(transaction.reimbursementExpected) || numberValue(transaction.outstandingReceivable);
+        outstandingReceivable += Math.max(gross - (collectedBySource.get(idOf(transaction._id)) ?? 0), 0);
+      } else {
+        outstandingReceivable += Math.max(numberValue(transaction.outstandingReceivable), 0);
+      }
     }
     if (type === "REIMBURSEMENT") reimbursementReceived += Math.max(numberValue(transaction.reimbursementReceived) || amount, 0);
   }
+  reimbursementReceived += [...collectedBySource.values()].reduce((sum, value) => sum + value, 0);
   return {
     statementAmount,
     paymentAmount,
@@ -145,13 +162,13 @@ const transactionDto = (value: Data): FinancialTransactionDto => ({
 
 const dateString = (value: unknown, fallback: string) => value ? String(value) : fallback;
 
-export const serializeStatementDto = (statement: Data, transactions: Data[] = [], includeTransactions = false): StatementDto => {
+export const serializeStatementDto = (statement: Data, transactions: Data[] = [], includeTransactions = false, linkedReimbursements: Data[] = []): StatementDto => {
   const value = plain(statement);
   const statementDate = dateString(value.statementDate, dateString(value.periodEndDate, "1970-01-01"));
   const periodStartDate = dateString(value.periodStartDate, statementDate);
   const periodEndDate = dateString(value.periodEndDate, statementDate);
   const paymentDueDate = dateString(value.paymentDueDate, statementDate);
-  const summary = summarizeStatementTransactions(transactions ?? []);
+  const summary = summarizeStatementTransactions(transactions ?? [], linkedReimbursements);
   return statementSchema.parse({
     id: idOf(value._id),
     cardId: idOf(value.userCardId),
@@ -262,13 +279,26 @@ export class StatementQueryServiceImpl {
 
   private async build(statements: Data[], workspaceId: string, includeTransactions: boolean) {
     const statementIds = statements.map((statement) => idOf(statement._id));
-    const [transactions] = await Promise.all([this.repository.listTransactions(workspaceId, statementIds, { summaryOnly: !includeTransactions })]);
+    const transactions = await this.repository.listTransactions(workspaceId, statementIds, { summaryOnly: !includeTransactions });
     const grouped = new Map<string, Data[]>();
     for (const transaction of transactions) {
       const id = idOf(transaction.statementId);
       grouped.set(id, [...(grouped.get(id) ?? []), transaction]);
     }
-    return statementListSchema.parse(statements.map((statement) => serializeStatementDto(statement, grouped.get(idOf(statement._id)) ?? [], includeTransactions))) as StatementDto[];
+    const sourceTransactionIds = transactions.filter((transaction) => transaction.transactionType === "EXPENSE" && transaction.ownership === "PAID_FOR_OTHER").map((transaction) => idOf(transaction._id));
+    const linkedReimbursements = this.repository.listReimbursements ? await this.repository.listReimbursements(workspaceId, sourceTransactionIds) : [];
+    const reimbursementsBySource = new Map<string, Data[]>();
+    for (const reimbursement of linkedReimbursements) {
+      const sourceId = reimbursement.reimbursementForTransactionId ? idOf(reimbursement.reimbursementForTransactionId) : "";
+      if (sourceId) reimbursementsBySource.set(sourceId, [...(reimbursementsBySource.get(sourceId) ?? []), reimbursement]);
+    }
+    return statementListSchema.parse(statements.map((statement) => {
+      const statementTransactions = grouped.get(idOf(statement._id)) ?? [];
+      const statementReimbursements = statementTransactions
+        .filter((transaction) => transaction.transactionType === "EXPENSE" && transaction.ownership === "PAID_FOR_OTHER")
+        .flatMap((transaction) => reimbursementsBySource.get(idOf(transaction._id)) ?? []);
+      return serializeStatementDto(statement, statementTransactions, includeTransactions, statementReimbursements);
+    })) as StatementDto[];
   }
 }
 
