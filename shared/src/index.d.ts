@@ -222,6 +222,9 @@ export type FinancialTransactionListQuery = {
   from?: string;
   to?: string;
   accountId?: string;
+  accountType?: "DEBIT" | "CASH" | "E_WALLET" | "CREDIT";
+  transactionType?: FinancialTransactionType;
+  ownership?: Ownership;
   categoryId?: string;
   limit?: number;
 };

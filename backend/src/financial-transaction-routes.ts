@@ -8,7 +8,7 @@ import { ApiError } from "./errors.js";
 type Body = Partial<CreateFinancialTransactionInput>;
 
 export const registerFinancialTransactionRoutes = (app: FastifyInstance, secret: string, users?: Pick<AuthRepository, "findUserById">) => {
-  app.get<{ Querystring: { accountId?: string; categoryId?: string; from?: string; to?: string; limit?: string } }>("/api/financial-transactions", async (request) => ({
+  app.get<{ Querystring: { accountId?: string; accountType?: string; transactionType?: string; ownership?: string; categoryId?: string; from?: string; to?: string; limit?: string } }>("/api/financial-transactions", async (request) => ({
     data: await FinancialTransactionService.list(
       await browserServiceContext(request, secret, users),
       (() => {

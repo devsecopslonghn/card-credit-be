@@ -8,7 +8,7 @@ import { ApiError } from "../errors.js";
 import { idOf, plain, statementPeriod, validDate } from "../statement-domain.js";
 import type { ServiceContext } from "./types/service-context.js";
 import { FINANCIAL_TRANSACTION_DEFAULT_LIMIT, FINANCIAL_TRANSACTION_MAX_LIMIT, financialTransactionListSchema, financialTransactionSchema } from "@card-credit/contracts";
-import type { CreateFinancialTransactionInput as SharedCreateFinancialTransactionInput, CreateFinancialTransactionBatchInput as SharedCreateFinancialTransactionBatchInput, UpdateFinancialTransactionInput, FinancialTransactionDto } from "@card-credit/contracts";
+import type { CreateFinancialTransactionInput as SharedCreateFinancialTransactionInput, CreateFinancialTransactionBatchInput as SharedCreateFinancialTransactionBatchInput, UpdateFinancialTransactionInput, FinancialTransactionDto, FinancialTransactionListQuery } from "@card-credit/contracts";
 import { canonicalPayloadHash } from "../command-hash.js";
 import { commandGuardService, type CommandInvocation } from "./command-guard-service.js";
 import { AccountService } from "./account-service.js";
@@ -309,9 +309,18 @@ export class FinancialTransactionService {
     return { id: transactionId };
   }
 
-  static async list(ctx: ServiceContext, filters: { accountId?: string; categoryId?: string; from?: string; to?: string; limit?: number } = {}) {
+  static async list(ctx: ServiceContext, filters: FinancialTransactionListQuery = {}) {
     const query: Record<string, unknown> = { workspaceId: ctx.workspaceId };
-    if (filters.accountId) query.accountId = filters.accountId;
+    if (filters.accountType || filters.accountId) {
+      const accountQuery: Record<string, unknown> = { workspaceId: ctx.workspaceId };
+      if (filters.accountId) accountQuery._id = filters.accountId;
+      if (filters.accountType) accountQuery.type = filters.accountType;
+      const accounts = await AccountModel.find(accountQuery).select({ _id: 1 }).lean();
+      if (!accounts.length) return [];
+      query.accountId = filters.accountId ? accounts[0]!._id : { $in: accounts.map((account) => account._id) };
+    }
+    if (filters.transactionType) query.transactionType = filters.transactionType;
+    if (filters.ownership) query.ownership = filters.ownership;
     if (filters.categoryId) query.categoryId = filters.categoryId;
     if (filters.from || filters.to) query.transactionDate = { ...(filters.from ? { $gte: filters.from } : {}), ...(filters.to ? { $lte: filters.to } : {}) };
     const limit = Math.min(Math.max(filters.limit ?? FINANCIAL_TRANSACTION_DEFAULT_LIMIT, 1), FINANCIAL_TRANSACTION_MAX_LIMIT);

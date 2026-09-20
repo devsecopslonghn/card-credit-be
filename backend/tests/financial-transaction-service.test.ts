@@ -46,6 +46,36 @@ test("financial transaction list applies the bounded limit before query executio
   assert.equal(calls.find((call) => call.name === "limit")?.value, 25);
 });
 
+test("financial transaction list filters account type through the canonical account reference", async (t) => {
+  let observedQuery: Record<string, unknown> | undefined;
+  const accountQuery = {
+    select: () => accountQuery,
+    lean: async () => [{ _id: "cash-account", type: "CASH" }],
+  };
+  t.mock.method(AccountModel, "find", (query: Record<string, unknown>) => {
+    assert.deepEqual(query, { workspaceId: context.workspaceId, type: "CASH" });
+    return accountQuery as never;
+  });
+  t.mock.method(FinancialTransactionModel, "find", (query: Record<string, unknown>) => {
+    observedQuery = query;
+    const chain = {
+      sort: () => chain,
+      limit: () => chain,
+      lean: async () => [],
+    };
+    return chain as never;
+  });
+
+  await FinancialTransactionService.list(context, { accountType: "CASH", transactionType: "EXPENSE", ownership: "PERSONAL" });
+
+  assert.deepEqual(observedQuery, {
+    workspaceId: context.workspaceId,
+    accountId: { $in: ["cash-account"] },
+    transactionType: "EXPENSE",
+    ownership: "PERSONAL",
+  });
+});
+
 test("financial transaction create persists the calculated service fee rate", async (t) => {
   const accountId = "507f1f77bcf86cd799439011";
   const cardId = "507f1f77bcf86cd799439012";
