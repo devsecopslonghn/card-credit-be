@@ -31,7 +31,7 @@ test("notifications use canonical statement status, preserve paid/orphan rows an
   const transactions = statementIds.map((statementId, index) => ({ _id: `507f1f77bcf86cd79943903${index + 1}`, statementId, accountId: cardId, accountType: "CREDIT", transactionType: "EXPENSE", ownership: "PERSONAL", categoryId: "OTHER", amount: 100 + index, creditDebt: 100 + index, personalSpending: 100 + index, debitCashflow: 0, outstandingReceivable: 0, reimbursementReceived: 0, transactionDate: "2099-06-01", note: "" }));
   const statementFind = t.mock.method(CardStatementModel, "find", () => chain(statements) as never);
   const transactionFind = t.mock.method(FinancialTransactionModel, "find", () => chain(transactions) as never);
-  const cardFind = t.mock.method(CreditCardModel, "find", () => chain([{ _id: cardId, workspaceId: "workspace-a", providerName: "Bank A", displayName: "Card A" }]) as never);
+  const cardFind = t.mock.method(CreditCardModel, "find", () => chain([{ _id: cardId, workspaceId: "workspace-a", presetId: "bank-a-card-a", providerCode: "BANKA", providerName: "Bank A", displayName: "Card A", network: "Visa", owner: "Tôi" }]) as never);
   const app = buildApp({ isReady: () => true }, "silent");
   registerNotificationRoutes(app, secret);
 

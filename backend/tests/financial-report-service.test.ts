@@ -56,7 +56,7 @@ test("summary reads benefit sources once, keeps ledger groups stable and avoids 
     { category: "BANK_CASHBACK", amount: 900 },
   ]) as never);
   const categoryFind = t.mock.method(FinanceCategoryModel, "find", () => chain([{ _id: "legacy-category", name: "LEGACY" }]) as never);
-  t.mock.method(CreditCardModel, "find", () => chain([]) as never);
+  t.mock.method(CreditCardModel, "find", () => chain([{ _id: statement.cardId, providerName: "VIB", displayName: "Max Card", owner: "Tôi" }]) as never);
   t.mock.method(StatementQueryService, "list", async (_ctx: ServiceContext, options: Record<string, unknown>) => options.includeTransactions === false ? [{ ...statement }] as never : [] as never);
 
   const result = await FinancialReportService.summary(context, { from: "2026-07-01", to: "2026-07-31" });
@@ -165,7 +165,7 @@ test("summary keeps settled receivables audit-only and excludes technical cashfl
   ]) as never);
   t.mock.method(MonthlyCardCashbackModel, "find", () => chain([]) as never);
   t.mock.method(CardFeePaymentModel, "find", () => chain([]) as never);
-  t.mock.method(CreditCardModel, "find", () => chain([]) as never);
+  t.mock.method(CreditCardModel, "find", () => chain([{ _id: statement.cardId, providerName: "VIB", displayName: "Max Card", owner: "Tôi" }]) as never);
   t.mock.method(StatementQueryService, "list", async (_ctx: ServiceContext, options: Record<string, unknown>) => options.includeTransactions === false ? [{ ...statement, summary: { ...statement.summary, outstandingAmount: 58_449_472 } }] as never : [] as never);
 
   const result = await FinancialReportService.summary(context, { from: "2026-08-01", to: "2026-08-31" });
