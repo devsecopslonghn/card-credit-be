@@ -40,7 +40,8 @@ test("summary reads benefit sources once, keeps ledger groups stable and avoids 
     { _id: "tx-fee", accountId: "account-credit", accountType: "CREDIT", transactionType: "EXPENSE", ownership: "PAID_FOR_OTHER", categoryId: "other", amount: 500, reimbursementExpected: 400, refundReceived: 25, cashbackReceived: 0, personalSpending: 75, debitCashflow: 0, creditDebt: 500, outstandingReceivable: 400, reimbursementReceived: 0 },
     { _id: "tx-payment", accountId: "account-debit", accountType: "DEBIT", transactionType: "STATEMENT_PAYMENT", ownership: "PERSONAL", categoryId: "OTHER", amount: 200, reimbursementExpected: 0, cashbackReceived: 0, personalSpending: 0, debitCashflow: -200, creditDebt: -200, outstandingReceivable: 0, reimbursementReceived: 0 },
   ];
-  const transactionFind = t.mock.method(FinancialTransactionModel, "find", (query: Record<string, unknown>) => chain(query.transactionType === "REIMBURSEMENT" ? [{ amount: 100 }] : transactions) as never);
+  const reimbursement = { _id: "tx-reimbursement", accountId: "account-debit", accountType: "DEBIT", transactionType: "REIMBURSEMENT", ownership: "PERSONAL", categoryId: "OTHER", amount: 100, reimbursementForTransactionId: "tx-fee", personalSpending: 0, debitCashflow: 100, creditDebt: 0, outstandingReceivable: 0, reimbursementReceived: 100 };
+  const transactionFind = t.mock.method(FinancialTransactionModel, "find", (query: Record<string, unknown>) => chain("transactionDate" in query ? transactions : [...transactions, reimbursement]) as never);
   t.mock.method(AccountModel, "find", () => chain([
     { _id: "account-credit", name: "Credit", type: "CREDIT", openingBalance: 0 },
     { _id: "account-debit", name: "Debit", type: "DEBIT", openingBalance: 0 },
@@ -71,7 +72,10 @@ test("summary reads benefit sources once, keeps ledger groups stable and avoids 
   assert.equal(result.totals.creditDebt, 1_300);
   assert.equal(result.creditDebtBalance, 500_000);
   assert.equal(result.byAccount["account-credit"]?.transactionCount, 2);
-  assert.equal(transactionFind.mock.callCount(), 3);
+  assert.equal(result.totals.outstandingReceivable, 300);
+  assert.equal(result.credit.outstandingReceivable, 300);
+  assert.equal(result.byAccount["account-credit"]?.outstandingReceivable, 300);
+  assert.equal(transactionFind.mock.callCount(), 2);
   assert.deepEqual(transactionFind.mock.calls[0]?.arguments[0], { workspaceId: "workspace-a", transactionDate: { $gte: "2026-07-01", $lte: "2026-07-31" } });
   assert.deepEqual(cashbackFind.mock.calls[0]?.arguments[0], { workspaceId: "workspace-a", period: { $gte: "2026-07", $lte: "2026-07" } });
   assert.deepEqual(feeFind.mock.calls[0]?.arguments[0], { workspaceId: "workspace-a", paymentDate: { $gte: "2026-07-01", $lte: "2026-07-31" }, category: { $in: ["ANNUAL_CARD_FEE", "MANAGEMENT_FEE", "OTHER_FEE"] } });

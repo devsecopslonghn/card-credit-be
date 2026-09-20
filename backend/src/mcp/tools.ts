@@ -105,7 +105,36 @@ export const registerMcpTools = (server: McpServer, ctx: ContextProvider, previe
     return json(await runQuery("get_personal_finance_summary", (context) => FinancialReportService.summary(context, range, Object.keys(filters).length ? filters : undefined)));
   });
   if (writerMode === "write") {
-    server.registerTool("preview_import_financial_transaction", mcpToolMetadata("preview_import_financial_transaction"), async (payload: CreateFinancialTransactionBatchInput) => { const context = await invocationContext(); const normalized = await FinancialTransactionService.preview(context, payload); const confirmationPayload = payload; const metadata = await previewService.issue(context, MCP_OPERATION.importFinancialTransactionBatch, confirmationPayload, codec()); return json({ operation: MCP_OPERATION.importFinancialTransactionBatch, payload: confirmationPayload, preview: normalized.items.map((item) => ({ amount: item.amount, direction: item.direction, targetMetric: item.targetMetric, beforeBalance: item.balanceBefore, afterBalance: item.balanceAfter, balanceDelta: item.balanceDelta, beforeDebt: item.beforeDebt, afterDebt: item.afterDebt, debtDelta: item.debtDelta, serviceFeeRate: item.technicalAdjustment ? 0 : item.serviceFeeRate ?? 0, serviceFee: item.technicalAdjustment ? 0 : item.amount - Number(item.reimbursementExpected ?? 0), reimbursementExpected: item.reimbursementExpected ?? 0, technicalAdjustment: item.technicalAdjustment ?? false, impact: item.previewImpact })), ...metadata }); });
+    server.registerTool("preview_import_financial_transaction", mcpToolMetadata("preview_import_financial_transaction"), async (payload: CreateFinancialTransactionBatchInput) => {
+      const context = await invocationContext();
+      const normalized = await FinancialTransactionService.preview(context, payload);
+      const confirmationPayload = payload;
+      const metadata = await previewService.issue(context, MCP_OPERATION.importFinancialTransactionBatch, confirmationPayload, codec());
+      return json({
+        operation: MCP_OPERATION.importFinancialTransactionBatch,
+        payload: confirmationPayload,
+        preview: normalized.items.map((item) => {
+          const isPaidForOtherExpense = item.transactionType === "EXPENSE" && item.ownership === "PAID_FOR_OTHER";
+          return {
+            amount: item.amount,
+            direction: item.direction,
+            targetMetric: item.targetMetric,
+            beforeBalance: item.balanceBefore,
+            afterBalance: item.balanceAfter,
+            balanceDelta: item.balanceDelta,
+            beforeDebt: item.beforeDebt,
+            afterDebt: item.afterDebt,
+            debtDelta: item.debtDelta,
+            serviceFeeRate: item.technicalAdjustment || !isPaidForOtherExpense ? 0 : item.serviceFeeRate ?? 0,
+            serviceFee: item.technicalAdjustment || !isPaidForOtherExpense ? 0 : item.amount - Number(item.reimbursementExpected ?? 0),
+            reimbursementExpected: item.reimbursementExpected ?? 0,
+            technicalAdjustment: item.technicalAdjustment ?? false,
+            impact: item.previewImpact,
+          };
+        }),
+        ...metadata,
+      });
+    });
     server.registerTool("confirm_import_financial_transaction", mcpToolMetadata("confirm_import_financial_transaction"), async ({ payload, confirmationToken, idempotencyKey }: { payload: CreateFinancialTransactionBatchInput; confirmationToken: string; idempotencyKey: string }) => { const context = await invocationContext(); const verification = codec().verify(confirmationToken, MCP_OPERATION.importFinancialTransactionBatch, payload, binding(context)); return json(await FinancialTransactionService.createBatch(context, payload, { idempotencyKey, endpointOrTool: "confirm_import_financial_transaction", previewId: verification.previewId, confirmationTokenHash: confirmationTokenHash(confirmationToken), previewPayloadHash: canonicalPayloadHash(payload) })); });
   }
   server.registerTool("list_accounts", mcpToolMetadata("list_accounts"), async ({ includeArchived }: { includeArchived?: boolean } = {}) => json(await AccountService.list(await invocationContext(), { includeArchived })));
