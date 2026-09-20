@@ -200,6 +200,7 @@ export class FinancialReportService {
       ? accounts.filter((account) => cardAccountIds.some((id) => String(id) === String(account._id)) || items.some((item) => String(item.accountId) === String(account._id)))
       : accounts;
     const accountNames = new Map(reportAccounts.map((account) => [String(account._id), String(account.name)]));
+    const accountTypes = new Map(reportAccounts.map((account) => [String(account._id), String(account.type)]));
 
     const grossReceivableBySource = new Map<string, number>();
     const sourceStatementById = new Map<string, string>();
@@ -234,7 +235,9 @@ export class FinancialReportService {
       const categoryTotals = byCategory.get(category) ?? empty();
       add(categoryTotals, reportValue);
       byCategory.set(category, categoryTotals);
-      const type = String(reportValue.accountType);
+      // Account.type is canonical. The transaction field is retained for
+      // historical audit but must not override the current account reference.
+      const type = accountTypes.get(String(reportValue.accountId)) ?? String(reportValue.accountType);
       const typeTotals = byAccountType.get(type) ?? empty();
       add(typeTotals, reportValue);
       byAccountType.set(type, typeTotals);

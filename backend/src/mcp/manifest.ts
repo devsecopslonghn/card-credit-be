@@ -33,7 +33,7 @@ export const MCP_OPERATION = {
 
 const definitions = [
   { name: "get_statement_summary", description: "Read a workspace-scoped credit-card statement summary from Financial Domain.", kind: "query", inputSchema: { statementId: z.string().min(1) } },
-  { name: "list_transactions", description: "List up to 100 workspace-scoped financial transactions from Financial Domain using an inclusive from/to date range, optional account/category filters and a bounded limit.", kind: "query", inputSchema: { ...financialTransactionListQuerySchema.shape, date: z.never().optional() } },
+  { name: "list_transactions", description: "List up to 100 workspace-scoped financial transactions using canonical date, account type, transaction type, ownership and category filters with a bounded limit.", kind: "query", inputSchema: { ...financialTransactionListQuerySchema.shape, date: z.never().optional() } },
   { name: "get_monthly_cash_flow", description: "Read canonical Financial Domain cash-flow totals by month and card in the fixed workspace.", kind: "query", inputSchema: { period: z.string().regex(/^[1-9]\d{3}-(0[1-9]|1[0-2])$/).optional(), cardId: z.string().min(1).optional() } },
   { name: "compare_cards", description: "Compare up to 100 active cards in the fixed workspace.", kind: "query", inputSchema: { limit: z.number().int().min(1).max(100).optional() } },
   { name: "find_cards", description: "Find active cards by card name, bank/provider or owner in the fixed workspace. Use this before card-specific statement queries when only a human-readable card name is known.", kind: "query", inputSchema: { query: z.string().trim().min(1).optional(), owner: z.string().trim().min(1).optional(), limit: z.number().int().min(1).max(100).optional() } },

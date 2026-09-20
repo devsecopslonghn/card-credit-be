@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date-contracts.js";
+import { accountTypeSchema } from "./account-contracts.js";
 
 export const financialTransactionTypeSchema = z.enum(["EXPENSE", "TRANSFER", "REIMBURSEMENT", "REFUND", "CASHBACK", "INCOME", "STATEMENT_PAYMENT", "BALANCE_ADJUSTMENT", "OPENING_BALANCE_ADJUSTMENT"]);
 export const ownershipSchema = z.enum(["PERSONAL", "PAID_FOR_OTHER"]);
@@ -39,6 +40,9 @@ export const financialTransactionListQuerySchema = z.object({
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
   accountId: z.string().trim().min(1).optional(),
+  accountType: accountTypeSchema.optional(),
+  transactionType: financialTransactionTypeSchema.optional(),
+  ownership: ownershipSchema.optional(),
   categoryId: z.string().trim().min(1).optional(),
   limit: z.number().int().min(1).max(FINANCIAL_TRANSACTION_MAX_LIMIT).default(FINANCIAL_TRANSACTION_DEFAULT_LIMIT),
 }).strict().superRefine((query, context) => {

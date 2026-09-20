@@ -19,8 +19,8 @@ test("transaction batch is bounded", () => {
 });
 
 test("transaction list query is strict, ordered and bounded across REST and MCP", () => {
-  assert.deepEqual(financialTransactionListQuerySchema.parse({ from: "2026-08-01", to: "2026-08-16", accountId: " account-1 ", categoryId: " food ", limit: 20 }), {
-    from: "2026-08-01", to: "2026-08-16", accountId: "account-1", categoryId: "food", limit: 20,
+  assert.deepEqual(financialTransactionListQuerySchema.parse({ from: "2026-08-01", to: "2026-08-16", accountId: " account-1 ", accountType: "CASH", transactionType: "EXPENSE", ownership: "PERSONAL", categoryId: " food ", limit: 20 }), {
+    from: "2026-08-01", to: "2026-08-16", accountId: "account-1", accountType: "CASH", transactionType: "EXPENSE", ownership: "PERSONAL", categoryId: "food", limit: 20,
   });
   assert.equal(financialTransactionListQuerySchema.parse({}).limit, 100);
   for (const query of [
