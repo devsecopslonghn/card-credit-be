@@ -50,6 +50,39 @@ test("MCP transaction batch confirm forwards the fixed command invocation", asyn
   assert.equal(createBatch.mock.callCount(), 1);
 });
 
+test("MCP transaction preview reports no service fee for a reimbursement", async (t) => {
+  t.mock.method(FinancialTransactionService, "preview", async () => ({
+    items: [{
+      transactionType: "REIMBURSEMENT",
+      ownership: "PERSONAL",
+      amount: 16_601_760,
+      serviceFeeRate: 0,
+      reimbursementExpected: 0,
+      previewImpact: { grossAmount: 16_601_760, personalSpending: 0, debitCashflow: 16_601_760, creditDebt: 0, outstandingReceivable: 0, reimbursementReceived: 16_601_760 },
+    }],
+  }) as never);
+  const previewService = { issue: async () => ({ previewId: "00000000-0000-4000-8000-000000000001", confirmationToken: "token", expiresAt: 1, expiresInSeconds: 300 }) } as unknown as PreviewConfirmationService;
+
+  const response = await call("preview_import_financial_transaction", { items: [{ accountId: "cash-1", transactionType: "REIMBURSEMENT", amount: 16_601_760, transactionDate: "2026-09-17" }] }, previewService) as { preview: Array<{ serviceFee: number; serviceFeeRate: number }> };
+
+  assert.deepEqual(response.preview[0], {
+    amount: 16_601_760,
+    direction: undefined,
+    targetMetric: undefined,
+    beforeBalance: undefined,
+    afterBalance: undefined,
+    balanceDelta: undefined,
+    beforeDebt: undefined,
+    afterDebt: undefined,
+    debtDelta: undefined,
+    serviceFeeRate: 0,
+    serviceFee: 0,
+    reimbursementExpected: 0,
+    technicalAdjustment: false,
+    impact: { grossAmount: 16_601_760, personalSpending: 0, debitCashflow: 16_601_760, creditDebt: 0, outstandingReceivable: 0, reimbursementReceived: 16_601_760 },
+  });
+});
+
 test("MCP payment preview and confirm use the canonical payment service and exact preview payload", async (t) => {
   const cardId = "507f1f77bcf86cd799439011";
   const statementId = "507f1f77bcf86cd799439021";

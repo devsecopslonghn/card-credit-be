@@ -227,13 +227,14 @@ export class FinancialTransactionService {
       ownership: input.ownership ?? "PERSONAL",
       amount: input.amount,
       reimbursementExpected: effectiveReimbursementExpected ?? 0,
+      serviceFeeRate: technicalAdjustmentTypes.has(String(input.transactionType)) ? 0 : input.serviceFeeRate ?? 0,
       refundReceived: input.refundReceived ?? 0,
       cashbackReceived: input.cashbackReceived ?? 0,
       categoryId: input.categoryId?.trim() || "OTHER",
       transactionDate: input.transactionDate,
       note: normalizedNote(input.note),
       ...impact,
-      ...(technicalAdjustmentTypes.has(String(input.transactionType)) ? { targetMetric: accountType === "CREDIT" ? "currentDebt" : "currentBalance", technicalDelta: input.direction === "DECREASE" ? -input.amount : input.amount, serviceFeeRate: 0 } : {}),
+      ...(technicalAdjustmentTypes.has(String(input.transactionType)) ? { targetMetric: accountType === "CREDIT" ? "currentDebt" : "currentBalance", technicalDelta: input.direction === "DECREASE" ? -input.amount : input.amount } : {}),
     }], { session });
     return serialize(created[0]);
   }

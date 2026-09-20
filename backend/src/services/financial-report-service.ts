@@ -199,23 +199,48 @@ export class FinancialReportService {
     const reportAccounts = reportCardIds
       ? accounts.filter((account) => cardAccountIds.some((id) => String(id) === String(account._id)) || items.some((item) => String(item.accountId) === String(account._id)))
       : accounts;
+    const accountNames = new Map(reportAccounts.map((account) => [String(account._id), String(account.name)]));
+
+    const grossReceivableBySource = new Map<string, number>();
+    const sourceStatementById = new Map<string, string>();
+    for (const item of allAccountTransactions) {
+      if (item.transactionType !== "EXPENSE" || item.ownership !== "PAID_FOR_OTHER") continue;
+      // reimbursementExpected is the authoritative gross claim for the source expense.
+      const sourceId = String(item._id);
+      grossReceivableBySource.set(sourceId, Math.max(0, Number(item.reimbursementExpected ?? 0)));
+      if (item.statementId) sourceStatementById.set(sourceId, String(item.statementId));
+    }
+    const collectedBySource = new Map<string, number>();
+    for (const item of allAccountTransactions) if (item.transactionType === "REIMBURSEMENT" && item.reimbursementForTransactionId) {
+      const sourceId = String(item.reimbursementForTransactionId);
+      collectedBySource.set(sourceId, (collectedBySource.get(sourceId) ?? 0) + Math.max(0, Number(item.amount ?? item.reimbursementReceived ?? 0)));
+    }
+    for (const item of allAccountTransactions) {
+      if (item.transactionType !== "EXPENSE" || item.ownership !== "PAID_FOR_OTHER" || !["SETTLED", "COLLECTED"].includes(String(item.receivableStatus))) continue;
+      const sourceId = String(item._id);
+      collectedBySource.set(sourceId, Math.max(collectedBySource.get(sourceId) ?? 0, Number(item.receivableSettledAmount ?? item.reimbursementExpected ?? 0)));
+    }
+    const currentReceivableBySource = new Map([...grossReceivableBySource.entries()].map(([sourceId, gross]) => [sourceId, Math.max(0, gross - (collectedBySource.get(sourceId) ?? 0))]));
+
     const byCategory = new Map<string, ReturnType<typeof empty>>();
     const byAccountType = new Map<string, ReturnType<typeof empty>>();
-    const accountNames = new Map(reportAccounts.map((account) => [String(account._id), String(account.name)]));
     const byAccount = new Map<string, ReturnType<typeof empty>>();
     for (const item of items) {
       const value = item as Record<string, unknown>;
-      const category = String(value.categoryId ?? "OTHER");
+      const reportValue = value.transactionType === "EXPENSE" && value.ownership === "PAID_FOR_OTHER"
+        ? { ...value, outstandingReceivable: currentReceivableBySource.get(String(value._id)) ?? 0 }
+        : value;
+      const category = String(reportValue.categoryId ?? "OTHER");
       const categoryTotals = byCategory.get(category) ?? empty();
-      add(categoryTotals, value);
+      add(categoryTotals, reportValue);
       byCategory.set(category, categoryTotals);
-      const type = String(value.accountType);
+      const type = String(reportValue.accountType);
       const typeTotals = byAccountType.get(type) ?? empty();
-      add(typeTotals, value);
+      add(typeTotals, reportValue);
       byAccountType.set(type, typeTotals);
-      const accountId = String(value.accountId);
+      const accountId = String(reportValue.accountId);
       const accountTotals = byAccount.get(accountId) ?? empty();
-      add(accountTotals, value);
+      add(accountTotals, reportValue);
       byAccount.set(accountId, accountTotals);
     }
     const totals = emptyTotals();
@@ -244,9 +269,6 @@ export class FinancialReportService {
     totals.realIncome = items.reduce((sum, item) => sum + (item.transactionType === "INCOME" ? Math.max(0, Number(item.amount ?? 0)) : 0), 0);
     totals.technicalAdjustments = allAccountTransactions.reduce((sum, item) => sum + (technicalTypes.has(String(item.transactionType)) ? Number(item.amount ?? 0) : 0), 0);
     totals.operatingCashflow = items.reduce((sum, item) => sum + (technicalTypes.has(String(item.transactionType)) ? 0 : Number(item.debitCashflow ?? 0)), 0);
-    const sourceIds = items.filter((item) => item.transactionType === "EXPENSE" && item.ownership === "PAID_FOR_OTHER").map((item) => item._id);
-    const reimbursements = sourceIds.length ? await readReportCollection<Data>(FinancialTransactionModel.find({ workspaceId: ctx.workspaceId, transactionType: "REIMBURSEMENT", reimbursementForTransactionId: { $in: sourceIds } }).select({ amount: 1 })) : [];
-    totals.outstandingReceivable = Math.max(0, totals.outstandingReceivable - reimbursements.reduce((sum, item) => sum + Number(item.amount ?? 0), 0));
     const creditDebtLedger = buildCreditDebtLedger(range, allStatements, ledgerCards);
     const allCashflowByAccount = new Map<string, number>();
     for (const item of allAccountTransactions) allCashflowByAccount.set(String(item.accountId), (allCashflowByAccount.get(String(item.accountId)) ?? 0) + Number(item.debitCashflow ?? 0));
@@ -268,35 +290,11 @@ export class FinancialReportService {
     const currentDebtLedger = buildCurrentDebtLedger(allStatements, ledgerCards, technicalAdjustmentsByCard);
     totals.currentCardDebt = currentDebtLedger.reduce((sum, item) => sum + item.currentDebt, 0);
     totals.paidStatementDebt = allStatements.reduce((sum, statement) => sum + Math.max(0, Number(statement.summary?.paymentAmount ?? 0)), 0);
-    const grossReceivableBySource = new Map<string, number>();
-    const openReceivableBySource = new Map<string, number>();
-    const sourceStatementById = new Map<string, string>();
-    for (const item of allAccountTransactions) {
-      if (item.transactionType !== "EXPENSE" || item.ownership !== "PAID_FOR_OTHER") continue;
-      // reimbursementExpected is the authoritative gross claim for the source expense.
-      const sourceId = String(item._id);
-      // `outstandingReceivable` is a historical calculated impact and is not a
-      // current receivable source. Only the source claim is valid for audit.
-      const gross = Math.max(0, Number(item.reimbursementExpected ?? 0));
-      grossReceivableBySource.set(sourceId, gross);
-      if (!["SETTLED", "COLLECTED"].includes(String(item.receivableStatus))) openReceivableBySource.set(sourceId, gross);
-      if (item.statementId) sourceStatementById.set(String(item._id), String(item.statementId));
-    }
-    const collectedBySource = new Map<string, number>();
-    for (const item of allAccountTransactions) if (item.transactionType === "REIMBURSEMENT" && item.reimbursementForTransactionId) {
-      const sourceId = String(item.reimbursementForTransactionId);
-      collectedBySource.set(sourceId, (collectedBySource.get(sourceId) ?? 0) + Math.max(0, Number(item.amount ?? item.reimbursementReceived ?? 0)));
-    }
-    for (const item of allAccountTransactions) {
-      if (item.transactionType !== "EXPENSE" || item.ownership !== "PAID_FOR_OTHER" || !["SETTLED", "COLLECTED"].includes(String(item.receivableStatus))) continue;
-      const sourceId = String(item._id);
-      collectedBySource.set(sourceId, Math.max(collectedBySource.get(sourceId) ?? 0, Number(item.receivableSettledAmount ?? item.reimbursementExpected ?? 0)));
-    }
     const paidStatementIds = new Set(allStatements.filter((statement) => String(statement.paymentStatus) === "PAID").map((statement) => String(statement.id)));
     totals.grossReceivable = [...grossReceivableBySource.values()].reduce((sum, value) => sum + value, 0);
     totals.collectedReceivable = [...collectedBySource.values()].reduce((sum, value) => sum + value, 0);
     totals.paidStatementReceivable = [...collectedBySource.entries()].reduce((sum, [sourceId, value]) => sum + (paidStatementIds.has(sourceStatementById.get(sourceId) ?? "") ? value : 0), 0);
-    totals.outstandingReceivable = [...openReceivableBySource.entries()].reduce((sum, [sourceId, value]) => sum + Math.max(0, value - (collectedBySource.get(sourceId) ?? 0)), 0);
+    totals.outstandingReceivable = [...currentReceivableBySource.values()].reduce((sum, value) => sum + value, 0);
     const netAssets = activeRealMoney + totals.outstandingReceivable - totals.currentCardDebt;
     const creditDebtBalance = totals.currentCardDebt;
     return financialReportSchema.parse({

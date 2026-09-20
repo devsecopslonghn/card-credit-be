@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { AccountModel } from "../src/models/account.js";
+import { CardStatementModel } from "../src/models/card-statement.js";
+import { CreditCardModel } from "../src/models/credit-card.js";
 import { FinancialTransactionModel } from "../src/models/financial-transaction.js";
 import { FinancialTransactionService } from "../src/services/financial-transaction-service.js";
+import { commandGuardService, type CommandGuardSpec } from "../src/services/command-guard-service.js";
 import type { ServiceContext } from "../src/services/types/service-context.js";
 
 const context: ServiceContext = { workspaceId: "workspace-a", userId: "user-a", role: "user", channel: "browser", correlationId: "transaction-list-limit-test" };
@@ -40,4 +44,35 @@ test("financial transaction list applies the bounded limit before query executio
 
   assert.equal(result.length, 1);
   assert.equal(calls.find((call) => call.name === "limit")?.value, 25);
+});
+
+test("financial transaction create persists the calculated service fee rate", async (t) => {
+  const accountId = "507f1f77bcf86cd799439011";
+  const cardId = "507f1f77bcf86cd799439012";
+  const statementId = "507f1f77bcf86cd799439013";
+  const account = { _id: accountId, workspaceId: context.workspaceId, type: "CREDIT", creditCardId: cardId };
+  const card = { _id: cardId, workspaceId: context.workspaceId, active: true, statementDay: 15, paymentDueDays: 15 };
+  let created: Record<string, unknown> | undefined;
+
+  t.mock.method(commandGuardService, "execute", async (_ctx: ServiceContext, _spec: CommandGuardSpec, work: (session: never) => Promise<unknown>) => work({} as never));
+  t.mock.method(AccountModel, "findOne", () => ({ session: () => ({ lean: async () => account }) }) as never);
+  t.mock.method(CreditCardModel, "findOne", () => ({ session: () => ({ lean: async () => card }) }) as never);
+  t.mock.method(CardStatementModel, "findOneAndUpdate", () => ({ lean: async () => ({ _id: statementId }) }) as never);
+  t.mock.method(FinancialTransactionModel, "create", async (documents: unknown) => {
+    created = (documents as Array<Record<string, unknown>>)[0];
+    return [{ ...created, _id: "transaction-1" }] as never;
+  });
+
+  await FinancialTransactionService.create(context, {
+    accountId,
+    transactionType: "EXPENSE",
+    ownership: "PAID_FOR_OTHER",
+    amount: 17_080_000,
+    serviceFeeRate: 2.8,
+    transactionDate: "2026-09-17",
+  }, { idempotencyKey: "service-fee-persist-test", endpointOrTool: "test" });
+
+  assert.equal(created?.serviceFeeRate, 2.8);
+  assert.equal(created?.reimbursementExpected, 16_601_760);
+  assert.equal(created?.personalSpending, 478_240);
 });
