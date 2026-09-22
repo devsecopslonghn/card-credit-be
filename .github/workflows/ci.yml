@@ -1,77 +1,29 @@
 name: Backend CI
+
 on:
-  push: {branches: [master, main]}
+  push:
+    branches: [master]
   pull_request:
-permissions: {contents: read, packages: write}
+    branches: [master]
+
+permissions:
+  contents: read
+
 jobs:
-  quality:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: {node-version: "22"}
-      - name: Install dependencies
-        run: |
-          npm --prefix shared ci
-          npm --prefix backend ci --include=optional
-      - name: Validate
-        run: |
-          npm --prefix shared run validate
-          npm --prefix backend run validate
-      - name: Checkout frontend contract mirror
-        uses: actions/checkout@v4
-        with:
-          repository: devsecopslonghn/card-credit-fe
-          path: frontend-contract-mirror
-      - name: Check frontend/backend contract and catalog drift
-        run: node backend/scripts/check-contract-drift.mjs frontend-contract-mirror
-  image:
-    needs: quality
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
-        with: {registry: '${{ vars.GHCR_REGISTRY }}', username: '${{ github.actor }}', password: '${{ github.token }}'}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: backend/Dockerfile
-          push: true
-          tags: |
-            ${{ vars.GHCR_REGISTRY }}/${{ github.repository_owner }}/card-credit-be:${{ github.sha }}
-            ${{ vars.GHCR_REGISTRY }}/${{ github.repository_owner }}/card-credit-be:latest
-  update-chart:
-    needs: image
-    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: devsecopslonghn/card-credit-helm-chart
-          token: ${{ secrets.GITOPS_TOKEN }}
-          path: chart
-      - name: Update backend image tag
-        working-directory: chart
-        env:
-          IMAGE_TAG: ${{ github.sha }}
-          GHCR_REGISTRY: ${{ vars.GHCR_REGISTRY }}
-          IMAGE_OWNER: ${{ github.repository_owner }}
-        run: |
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-          path = Path("values.yaml")
-          lines = path.read_text().splitlines()
-          for i, line in enumerate(lines):
-              if line == "  backend:" and i + 1 < len(lines):
-                  lines[i + 1] = "    tag: " + os.environ["IMAGE_TAG"]
-              if line.strip() == "repository: ghcr.io/devsecopslonghn/card-credit-be":
-                  lines[i] = "    repository: " + os.environ["GHCR_REGISTRY"] + "/" + os.environ["IMAGE_OWNER"] + "/card-credit-be"
-          path.write_text("\n".join(lines) + "\n")
-          PY
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add values.yaml
-          git diff --cached --quiet || git commit -m "chore(images): deploy backend ${{ github.sha }} [skip ci]"
-          git push origin master
+  build:
+    uses: devsecopslonghn/.github/.github/workflows/node-container.yml@9dce2f58f486a6bfb0a0d25c1ad901aaa342d0df
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    with:
+      node_version: '22'
+      working_directory: backend
+      test_script: 'npm run test:critical'
+      registry: ghcr.io
+      image_name: devsecopslonghn/card-credit-backend
+      chart_repo: devsecopslonghn/card-credit-helm-chart
+      chart_path: values.yaml
+      chart_image_key: backend.image.tag
+    secrets:
+      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
