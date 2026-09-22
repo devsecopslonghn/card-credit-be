@@ -19,6 +19,7 @@ jobs:
     with:
       node_version: '22'
       working_directory: backend
+      docker_context: backend
       test_script: 'npm run test:critical'
       registry: ghcr.io
       image_name: devsecopslonghn/card-credit-backend
