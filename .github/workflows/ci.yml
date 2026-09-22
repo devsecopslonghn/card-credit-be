@@ -1,77 +1,122 @@
 name: Backend CI
+
 on:
-  push: {branches: [master, main]}
+  push:
+    branches: [master, main]
   pull_request:
-permissions: {contents: read, packages: write}
+
+permissions:
+  contents: read
+
 jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: {node-version: "22"}
+      - name: Checkout backend
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            shared/package-lock.json
+
       - name: Install dependencies
         run: |
           npm --prefix shared ci
           npm --prefix backend ci --include=optional
-      - name: Validate
+
+      - name: Validate backend and shared contracts
         run: |
           npm --prefix shared run validate
           npm --prefix backend run validate
+
       - name: Checkout frontend contract mirror
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: devsecopslonghn/card-credit-fe
           path: frontend-contract-mirror
+          persist-credentials: false
+
       - name: Check frontend/backend contract and catalog drift
         run: node backend/scripts/check-contract-drift.mjs frontend-contract-mirror
-  image:
+
+  build:
     needs: quality
-    if: github.event_name != 'pull_request'
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+    uses: devsecopslonghn/.github/.github/workflows/node-container.yml@9dce2f58f486a6bfb0a0d25c1ad901aaa342d0df
+    with:
+      node_version: "22"
+      working_directory: backend
+      install_command: npm ci --include=optional && npm --prefix ../shared ci
+      quality_command: npm --prefix ../shared run validate && npm run validate
+      build_command: npm run build
+      docker_context: .
+      dockerfile: backend/Dockerfile
+      image_name: ghcr.io/devsecopslonghn/card-credit-be
+      publish_image: ${{ github.event_name != 'pull_request' }}
+
+  update-gitops:
+    needs: build
+    if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_BRANCH: release/backend-${{ github.sha }}
+      IMAGE_REPOSITORY: ghcr.io/devsecopslonghn/card-credit-be
+      IMAGE_TAG: ${{ github.sha }}@${{ needs.build.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
-        with: {registry: '${{ vars.GHCR_REGISTRY }}', username: '${{ github.actor }}', password: '${{ github.token }}'}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: backend/Dockerfile
-          push: true
-          tags: |
-            ${{ vars.GHCR_REGISTRY }}/${{ github.repository_owner }}/card-credit-be:${{ github.sha }}
-            ${{ vars.GHCR_REGISTRY }}/${{ github.repository_owner }}/card-credit-be:latest
-  update-chart:
-    needs: image
-    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Validate immutable release output
+        run: |
+          [[ "$IMAGE_TAG" =~ ^[a-f0-9]{40}@sha256:[a-f0-9]{64}$ ]]
+
+      - name: Checkout Helm chart
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: devsecopslonghn/card-credit-helm-chart
+          ref: master
           token: ${{ secrets.GITOPS_TOKEN }}
           path: chart
-      - name: Update backend image tag
+
+      - name: Open immutable GitOps update
         working-directory: chart
         env:
-          IMAGE_TAG: ${{ github.sha }}
-          GHCR_REGISTRY: ${{ vars.GHCR_REGISTRY }}
-          IMAGE_OWNER: ${{ github.repository_owner }}
+          GH_TOKEN: ${{ secrets.GITOPS_TOKEN }}
         run: |
+          set -euo pipefail
+          existing=$(gh pr list --repo devsecopslonghn/card-credit-helm-chart --head "$RELEASE_BRANCH" --state open --json url --jq '.[0].url // empty')
+          if test -n "$existing"; then echo "Existing release PR: $existing"; exit 0; fi
+          git switch -c "$RELEASE_BRANCH"
           python3 - <<'PY'
           import os
+          import re
           from pathlib import Path
+
           path = Path("values.yaml")
-          lines = path.read_text().splitlines()
-          for i, line in enumerate(lines):
-              if line == "  backend:" and i + 1 < len(lines):
-                  lines[i + 1] = "    tag: " + os.environ["IMAGE_TAG"]
-              if line.strip() == "repository: ghcr.io/devsecopslonghn/card-credit-be":
-                  lines[i] = "    repository: " + os.environ["GHCR_REGISTRY"] + "/" + os.environ["IMAGE_OWNER"] + "/card-credit-be"
-          path.write_text("\n".join(lines) + "\n")
+          text = path.read_text()
+          match = re.search(r"(?ms)^  backend:\n.*?(?=^  [a-zA-Z]|^[a-zA-Z]|\Z)", text)
+          if not match:
+              raise SystemExit("backend image block was not found")
+          block = match.group(0)
+          block, repo_count = re.subn(r"(?m)^    repository:.*$", f"    repository: {os.environ['IMAGE_REPOSITORY']}", block, count=1)
+          block, tag_count = re.subn(r"(?m)^    tag:.*$", f"    tag: {os.environ['IMAGE_TAG']}", block, count=1)
+          if repo_count != 1 or tag_count != 1:
+              raise SystemExit("backend image reference was not updated exactly once")
+          path.write_text(text[:match.start()] + block + text[match.end():])
           PY
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add values.yaml
-          git diff --cached --quiet || git commit -m "chore(images): deploy backend ${{ github.sha }} [skip ci]"
-          git push origin master
+          git diff --cached --quiet && { echo 'Chart already references this digest'; exit 0; }
+          git commit -m "chore(gitops): deploy backend $GITHUB_SHA [skip ci]"
+          git push origin "HEAD:$RELEASE_BRANCH"
+          gh pr create --repo devsecopslonghn/card-credit-helm-chart --base master --head "$RELEASE_BRANCH" --title "chore(gitops): deploy backend $GITHUB_SHA" --body "Deploy the exact CI-scanned backend image: $IMAGE_TAG. Merge after chart validation and application review."
