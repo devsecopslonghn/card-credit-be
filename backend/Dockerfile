@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-alpine AS deps
+FROM node:22-alpine@sha256:b6f26b36c8ff49624cfdac716b8ea1138d606df02586a77d364bb5536a634f85 AS deps
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY shared/package.json shared/package-lock.json /shared/
@@ -9,7 +9,7 @@ COPY shared /shared
 COPY backend/package.json backend/package-lock.json ./
 RUN --mount=type=cache,id=card-credit-backend-build-npm,target=/root/.npm npm ci
 
-FROM node:22-alpine AS builder
+FROM node:22-alpine@sha256:b6f26b36c8ff49624cfdac716b8ea1138d606df02586a77d364bb5536a634f85 AS builder
 WORKDIR /app
 COPY --from=deps /shared /shared
 COPY --from=deps /app/node_modules ./node_modules
@@ -17,13 +17,17 @@ COPY backend/ .
 RUN npm run build
 RUN npm prune --omit=dev && npm cache clean --force
 
-FROM node:22-alpine AS runner
+FROM node:22-alpine@sha256:b6f26b36c8ff49624cfdac716b8ea1138d606df02586a77d364bb5536a634f85 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV BACKEND_HOST=0.0.0.0
 ENV BACKEND_PORT=3001
 ENV CARD_CATALOG_PATH=/app/catalog/card-presets.json
-RUN addgroup -S backend && adduser -S backend -G backend
+RUN apk upgrade --no-cache && \
+    rm -rf /usr/local/lib/node_modules/npm && \
+    rm -f /usr/local/bin/npm /usr/local/bin/npx && \
+    addgroup -S backend && \
+    adduser -S backend -G backend
 ENV NODE_OPTIONS="--experimental-loader=@opentelemetry/instrumentation/hook.mjs --import @opentelemetry/auto-instrumentations-node/register"
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /shared /shared
