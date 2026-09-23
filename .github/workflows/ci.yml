@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout backend
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,7 +52,7 @@ jobs:
       actions: read
       contents: read
       packages: write
-    uses: devsecopslonghn/.github/.github/workflows/node-container.yml@fe26ac4feca06d982f9ff9e0027fb7cb65d619aa
+    uses: devsecopslonghn/.github/.github/workflows/node-container.yml@498050672be25d0df25eb195ab66b1ae9ea7957a
     with:
       node_version: "22"
       working_directory: backend
@@ -67,7 +67,7 @@ jobs:
   update-gitops:
     needs: build
     if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     env:
