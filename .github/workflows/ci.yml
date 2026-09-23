@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout backend
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
           cache: npm
@@ -37,7 +37,7 @@ jobs:
           npm --prefix backend run validate
 
       - name: Checkout frontend contract mirror
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: devsecopslonghn/card-credit-fe
           path: frontend-contract-mirror
@@ -52,7 +52,7 @@ jobs:
       actions: read
       contents: read
       packages: write
-    uses: devsecopslonghn/.github/.github/workflows/node-container.yml@9dce2f58f486a6bfb0a0d25c1ad901aaa342d0df
+    uses: devsecopslonghn/.github/.github/workflows/node-container.yml@fe26ac4feca06d982f9ff9e0027fb7cb65d619aa
     with:
       node_version: "22"
       working_directory: backend
@@ -80,7 +80,7 @@ jobs:
           [[ "$IMAGE_TAG" =~ ^[a-f0-9]{40}@sha256:[a-f0-9]{64}$ ]]
 
       - name: Checkout Helm chart
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: devsecopslonghn/card-credit-helm-chart
           ref: master
