@@ -34,7 +34,7 @@
     "@opentelemetry/auto-instrumentations-node": "0.79.0",
     "fastify": "^5.12.1",
     "mongoose": "^9.6.2",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.0.9",
     "zod": "^4.4.3"
   },
   "devDependencies": {
