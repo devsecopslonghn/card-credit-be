@@ -91,6 +91,7 @@ const buildCurrentDebtLedger = (
   statements: StatementDto[],
   cards: Data[],
   technicalAdjustmentsByCard: Map<string, number>,
+  openingBalanceByCard: Map<string, number> = new Map(),
 ): CurrentDebtLedgerItemDto[] => {
   const statementTotalsByCard = new Map<string, { statementOutstanding: number; nextPaymentDue: string | null }>();
   for (const statement of statements) {
