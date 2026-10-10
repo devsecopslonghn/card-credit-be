@@ -292,7 +292,12 @@ export class FinancialReportService {
       if (!cardId) continue;
       technicalAdjustmentsByCard.set(cardId, (technicalAdjustmentsByCard.get(cardId) ?? 0) + Number(item.technicalDelta ?? 0));
     }
-    const currentDebtLedger = buildCurrentDebtLedger(allStatements, ledgerCards, technicalAdjustmentsByCard);
+    const openingBalanceByCard = new Map<string, number>(
+      accounts
+        .filter((account) => String(account.type) === "CREDIT" && account.creditCardId)
+        .map((account) => [String(account.creditCardId), Number(account.openingBalance ?? 0)]),
+    );
+    const currentDebtLedger = buildCurrentDebtLedger(allStatements, ledgerCards, technicalAdjustmentsByCard, openingBalanceByCard);
     totals.currentCardDebt = currentDebtLedger.reduce((sum, item) => sum + item.currentDebt, 0);
     totals.paidStatementDebt = allStatements.reduce((sum, statement) => sum + Math.max(0, Number(statement.summary?.paymentAmount ?? 0)), 0);
     const paidStatementIds = new Set(allStatements.filter((statement) => String(statement.paymentStatus) === "PAID").map((statement) => String(statement.id)));
