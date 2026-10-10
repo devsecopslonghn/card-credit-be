@@ -45,8 +45,11 @@ export class AccountService {
     for (const statement of statements) {
       const cardId = String(statement.cardId ?? "");
       if (!cardId) continue;
-      const outstanding = Number(statement.summary?.outstandingAmount ?? 0);
-      outstandingByCardId.set(cardId, (outstandingByCardId.get(cardId) ?? 0) + Math.max(0, outstanding));
+      // Preserve statement-level credits (refunds/cashback). Clamping each
+      // statement independently loses offsets when a later statement is
+      // negative and an earlier statement still carries the debt.
+      const netStatementDebt = Number(statement.summary?.statementAmount ?? 0) - Number(statement.summary?.paymentAmount ?? 0);
+      outstandingByCardId.set(cardId, (outstandingByCardId.get(cardId) ?? 0) + netStatementDebt);
     }
     return accounts.map((account): AccountDto => {
       const totals = balanceById.get(String(account._id)) ?? { debitCashflow: 0, creditDebt: 0 };
