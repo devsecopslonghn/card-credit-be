@@ -104,3 +104,11 @@ test("statement detail fails closed for malformed identifiers", async () => {
   assert.equal(await service.getById(ctx, "not-an-object-id"), null);
   await assert.rejects(() => service.get(ctx, cardId, "not-an-object-id"), (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === "INVALID_STATEMENT_ID");
 });
+
+test("partial reimbursement is deducted exactly once from statement receivable", () => {
+  const source = { _id: "507f1f77bcf86cd799439051", statementId, accountType: "CREDIT", transactionType: "EXPENSE", ownership: "PAID_FOR_OTHER", amount: 1000000, creditDebt: 1000000, personalSpending: 0, reimbursementExpected: 1000000, outstandingReceivable: 1000000, reimbursementReceived: 0 };
+  const payment = { reimbursementForTransactionId: source._id, amount: 400000, reimbursementReceived: 400000 };
+  const result = summarizeStatementTransactions([source], [payment]);
+  assert.equal(result.outstandingReceivable, 600000);
+  assert.equal(result.reimbursementReceived, 400000);
+});

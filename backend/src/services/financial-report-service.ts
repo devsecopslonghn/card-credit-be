@@ -91,14 +91,16 @@ const buildCurrentDebtLedger = (
   statements: StatementDto[],
   cards: Data[],
   technicalAdjustmentsByCard: Map<string, number>,
+  openingBalanceByCard: Map<string, number> = new Map(),
 ): CurrentDebtLedgerItemDto[] => {
   const statementTotalsByCard = new Map<string, { statementOutstanding: number; nextPaymentDue: string | null }>();
   for (const statement of statements) {
-    const outstanding = Math.max(0, Number(statement.summary.outstandingAmount ?? 0));
-    if (outstanding <= 0) continue;
+    // Offset negative statements against positive ones BEFORE clamping the
+    // card total. Otherwise a refund in a new cycle does not reduce old debt.
+    const outstanding = Number(statement.summary.statementAmount ?? 0) - Number(statement.summary.paymentAmount ?? 0);
     const cardId = statement.cardId;
     const current = statementTotalsByCard.get(cardId) ?? { statementOutstanding: 0, nextPaymentDue: null };
-    const nextPaymentDue = current.nextPaymentDue === null || statement.paymentDueDate < current.nextPaymentDue
+    const nextPaymentDue = outstanding > 0 && (current.nextPaymentDue === null || statement.paymentDueDate < current.nextPaymentDue)
       ? statement.paymentDueDate
       : current.nextPaymentDue;
     statementTotalsByCard.set(cardId, {
@@ -116,10 +118,10 @@ const buildCurrentDebtLedger = (
       providerName: String(card.providerName ?? ""),
       displayName: String(card.displayName ?? ""),
       owner: String(card.owner ?? "Tôi"),
-      statementOutstanding: statement.statementOutstanding,
+      statementOutstanding: Math.max(0, statement.statementOutstanding),
       technicalAdjustment,
-      currentDebt: Math.max(0, statement.statementOutstanding + technicalAdjustment),
-      nextPaymentDue: statement.nextPaymentDue,
+      currentDebt: Math.max(0, statement.statementOutstanding + technicalAdjustment + (openingBalanceByCard.get(cardId) ?? 0)),
+      nextPaymentDue: statement.statementOutstanding + technicalAdjustment + (openingBalanceByCard.get(cardId) ?? 0) > 0 ? statement.nextPaymentDue : null,
     };
   })) as CurrentDebtLedgerItemDto[];
 };
@@ -290,7 +292,12 @@ export class FinancialReportService {
       if (!cardId) continue;
       technicalAdjustmentsByCard.set(cardId, (technicalAdjustmentsByCard.get(cardId) ?? 0) + Number(item.technicalDelta ?? 0));
     }
-    const currentDebtLedger = buildCurrentDebtLedger(allStatements, ledgerCards, technicalAdjustmentsByCard);
+    const openingBalanceByCard = new Map<string, number>(
+      accounts
+        .filter((account) => String(account.type) === "CREDIT" && account.creditCardId)
+        .map((account) => [String(account.creditCardId), Number(account.openingBalance ?? 0)]),
+    );
+    const currentDebtLedger = buildCurrentDebtLedger(allStatements, ledgerCards, technicalAdjustmentsByCard, openingBalanceByCard);
     totals.currentCardDebt = currentDebtLedger.reduce((sum, item) => sum + item.currentDebt, 0);
     totals.paidStatementDebt = allStatements.reduce((sum, statement) => sum + Math.max(0, Number(statement.summary?.paymentAmount ?? 0)), 0);
     const paidStatementIds = new Set(allStatements.filter((statement) => String(statement.paymentStatus) === "PAID").map((statement) => String(statement.id)));

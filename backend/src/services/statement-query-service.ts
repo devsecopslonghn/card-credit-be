@@ -132,7 +132,9 @@ export const summarizeStatementTransactions = (transactions: Data[], linkedReimb
     paymentAmount,
     outstandingAmount: Math.max(statementAmount - paymentAmount, 0),
     personalSpending,
-    outstandingReceivable: Math.max(outstandingReceivable - reimbursementReceived, 0),
+    // Each PAID_FOR_OTHER source already subtracts its linked reimbursements.
+    // Subtracting reimbursementReceived again would double count collections.
+    outstandingReceivable: Math.max(outstandingReceivable, 0),
     reimbursementReceived,
     transactionCount,
   };

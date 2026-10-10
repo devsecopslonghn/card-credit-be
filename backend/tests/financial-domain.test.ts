@@ -98,3 +98,22 @@ test("paid-for-other fee rate is supplied by the caller", () => {
     { grossAmount: 1000000, personalSpending: 50000, debitCashflow: 0, creditDebt: 1000000, outstandingReceivable: 950000, reimbursementReceived: 0 },
   );
 });
+
+test("refund credited to card reduces card debt rather than real-money balance", () => {
+  const impact = calculateFinancialImpact({ accountType: "CREDIT", transactionType: "REFUND", amount: 480000 });
+  assert.equal(impact.creditDebt, -480000);
+  assert.equal(impact.debitCashflow, 0);
+  assert.equal(impact.personalSpending, 0);
+});
+
+test("refund to debit balance increases money without changing card debt", () => {
+  const impact = calculateFinancialImpact({ accountType: "DEBIT", transactionType: "REFUND", amount: 480000 });
+  assert.equal(impact.creditDebt, 0);
+  assert.equal(impact.debitCashflow, 480000);
+});
+
+test("cashback credited to card reduces card debt", () => {
+  const impact = calculateFinancialImpact({ accountType: "CREDIT", transactionType: "CASHBACK", amount: 50000 });
+  assert.equal(impact.creditDebt, -50000);
+  assert.equal(impact.debitCashflow, 0);
+});

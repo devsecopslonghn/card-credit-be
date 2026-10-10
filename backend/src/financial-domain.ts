@@ -99,7 +99,12 @@ export const calculateFinancialImpact = (
     grossAmount: amount,
     personalSpending,
     debitCashflow: isBalanceAdjustment && input.direction ? (input.direction === "DECREASE" ? -amount : amount) : isDebitOutflow ? -amount : isDebitInflow ? amount : 0,
-    creditDebt: isCreditCharge ? amount : type === "STATEMENT_PAYMENT" ? -amount : 0,
+    // Refunds and bank cashback credited directly to a CREDIT account reduce the
+    // outstanding card balance. A cash/bank refund instead increases real money.
+    creditDebt: isCreditCharge ? amount
+      : type === "STATEMENT_PAYMENT" || (input.accountType === "CREDIT" && (type === "REFUND" || type === "CASHBACK"))
+        ? -amount
+        : 0,
     outstandingReceivable:
       type === "EXPENSE" && ownership === "PAID_FOR_OTHER"
         ? reimbursementExpected
