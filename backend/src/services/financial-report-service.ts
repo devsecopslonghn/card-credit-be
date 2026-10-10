@@ -118,10 +118,10 @@ const buildCurrentDebtLedger = (
       providerName: String(card.providerName ?? ""),
       displayName: String(card.displayName ?? ""),
       owner: String(card.owner ?? "Tôi"),
-      statementOutstanding: statement.statementOutstanding,
+      statementOutstanding: Math.max(0, statement.statementOutstanding),
       technicalAdjustment,
-      currentDebt: Math.max(0, statement.statementOutstanding + technicalAdjustment),
-      nextPaymentDue: statement.nextPaymentDue,
+      currentDebt: Math.max(0, statement.statementOutstanding + technicalAdjustment + (openingBalanceByCard.get(cardId) ?? 0)),
+      nextPaymentDue: statement.statementOutstanding + technicalAdjustment + (openingBalanceByCard.get(cardId) ?? 0) > 0 ? statement.nextPaymentDue : null,
     };
   })) as CurrentDebtLedgerItemDto[];
 };
