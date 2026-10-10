@@ -95,11 +95,12 @@ const buildCurrentDebtLedger = (
 ): CurrentDebtLedgerItemDto[] => {
   const statementTotalsByCard = new Map<string, { statementOutstanding: number; nextPaymentDue: string | null }>();
   for (const statement of statements) {
-    const outstanding = Math.max(0, Number(statement.summary.outstandingAmount ?? 0));
-    if (outstanding <= 0) continue;
+    // Offset negative statements against positive ones BEFORE clamping the
+    // card total. Otherwise a refund in a new cycle does not reduce old debt.
+    const outstanding = Number(statement.summary.statementAmount ?? 0) - Number(statement.summary.paymentAmount ?? 0);
     const cardId = statement.cardId;
     const current = statementTotalsByCard.get(cardId) ?? { statementOutstanding: 0, nextPaymentDue: null };
-    const nextPaymentDue = current.nextPaymentDue === null || statement.paymentDueDate < current.nextPaymentDue
+    const nextPaymentDue = outstanding > 0 && (current.nextPaymentDue === null || statement.paymentDueDate < current.nextPaymentDue)
       ? statement.paymentDueDate
       : current.nextPaymentDue;
     statementTotalsByCard.set(cardId, {
